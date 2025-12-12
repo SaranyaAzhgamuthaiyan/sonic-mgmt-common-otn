@@ -1,0 +1,70 @@
+module sonic-optical-attenuator {
+  namespace "http://github.com/Azure/sonic-optical-attenuator";
+  prefix "sonic-opt-att";
+
+  import sonic-extension { prefix sonic-ext; }
+
+  organization
+    "SONiC";
+
+  contact
+    "SONiC";
+
+  description
+    "SONIC OPTICAL ATTENUATOR";
+
+  revision 2022-06-13 {
+    description
+      "Initial revision.";
+  }
+
+
+  container sonic-optical-attenuator {
+
+    container OTN_ATTENUATOR {
+
+      list OTN_ATTENUATOR_LIST {
+        key "name";
+
+        leaf name {
+          type string;
+            description
+              "User-defined name assigned to identify a specific attenuator
+              in the device";
+        }
+
+        leaf attenuation-mode {
+          type string;
+          description
+            "The operating mode of the attenuator";
+        }
+        
+        leaf target-output-power {
+          type decimal64 {
+            fraction-digits 2;
+          }
+          description
+            "Power level set on the output of attenuator.  This leaf is
+            only relevant when in CONSTANT_POWER mode.";
+        }
+        
+        leaf attenuation {
+          type decimal64 {
+            fraction-digits 2;
+          }
+          description
+            "Attenuation applied by the attenuator.  This leaf is only
+            relevant when in CONSTANT_ATTENUATION mode.";
+        }
+        
+        leaf enabled {
+          type boolean;
+          description
+            "When true, attenuator is set to specified attenuation or varies to
+             maintain constant output power.  When false, the attenuator is set
+             max attenuation or blocked.";
+        }
+      }
+    }
+  }
+}

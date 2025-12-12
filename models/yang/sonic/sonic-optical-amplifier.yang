@@ -1,0 +1,129 @@
+module sonic-optical-amplifier {
+	namespace "http://github.com/Azure/sonic-optical-amplifier";
+	prefix "sopt-amp";
+	
+	import sonic-extension {
+          prefix sonic-ext;
+        }
+
+	organization
+		"SONiC";
+
+	contact
+		"SONiC";
+
+	description
+		"SONIC OPTICAL AMPLIFIER";
+
+	revision 2022-06-13 {
+		description
+			"Initial revision.";
+	}
+
+
+	container sonic-optical-amplifier {
+
+		container OTN_OA {
+
+        list OTN_OA_LIST {
+            key "name";
+            
+            leaf name {
+              type string;
+              description
+              "User-defined name assigned to identify a specific amplifier
+                in the device";
+            }
+            
+            leaf type {
+              type string;
+              description
+                "Type of the amplifier";
+            }
+            
+            leaf target-gain {
+              type decimal64 {
+                fraction-digits 2;
+              }
+              description
+                "Positive gain applied by the amplifier.";
+            }
+            
+            leaf target-gain-tilt {
+              type decimal64 {
+                fraction-digits 2;
+              }
+              description
+                "Gain tilt control";
+            }
+            
+            leaf gain-range {
+              type string;
+              description
+                "Selected gain range.  The gain range is a platform-defined
+                 value indicating the switched gain amplifier setting";
+            }
+            
+            leaf amp-mode {
+              type string;
+              description
+                "The operating mode of the amplifier";
+            }
+            
+            leaf target-output-power {
+              type decimal64 {
+                fraction-digits 2;
+              }
+              description
+                "Output optical power of the amplifier.";
+            }
+            
+            leaf enabled {
+              type boolean;
+              description
+                "Turns power on / off to the amplifiers gain module.";
+            }
+            
+            leaf fiber-type-profile {
+              type string;
+              description
+                "The fiber type profile specifies details about the
+                fiber type which are needed to accurately determine
+                the gain and perform efficient amplification. This is
+                only needed for Raman type amplifiers.";
+            } 
+            
+            leaf autolos {
+              type boolean;
+              description
+                "Determines the behavior of the amplifier on input LOS.";
+            }
+
+            leaf apr-enabled {
+              type boolean;
+              description
+                "Turns apr on / off to the amplifiers.";
+            }            
+          }
+    }
+
+    container OTN_OSC {
+
+      list OTN_OSC_LIST {
+        key "interface";
+        
+        leaf interface {
+          type string;
+          description
+          "Reference to an OSC interface";
+        }
+
+        leaf enabled {
+          type boolean;
+          description
+          "turn on/off sfp";
+        }
+      }
+    }
+  }
+}
