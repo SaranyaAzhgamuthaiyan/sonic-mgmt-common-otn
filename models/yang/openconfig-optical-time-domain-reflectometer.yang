@@ -3,7 +3,7 @@ module openconfig-optical-time-domain-reflectometer {
   yang-version "1";
 
   // namespace
-  namespace "http://openconfig.net/yang/otdr";
+  namespace "http://openconfig.net/yang/optical-time-domain-reflectometer";
 
   prefix "oc-otdr";
 
@@ -627,3 +627,4 @@ module openconfig-optical-time-domain-reflectometer {
   }
 
 }
+
