@@ -84,7 +84,7 @@ func init() {
 	XlateFuncBind("validate_bgp_proto", validate_bgp_proto)
 	XlateFuncBind("validate_ospfv2_proto", validate_ospfv2_proto)
 
-	// Sonic yang Key transformer functions
+	//Sonic yang Key transformer functions
 	XlateFuncBind("DbToYang_test_sensor_mode_key_xfmr", DbToYang_test_sensor_mode_key_xfmr)
 }
 
