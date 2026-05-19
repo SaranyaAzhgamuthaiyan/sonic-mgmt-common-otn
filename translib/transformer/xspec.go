@@ -122,7 +122,9 @@ type mdlInfo struct {
 	Ver string
 }
 
-var dbConfigMap = make(map[string]interface{})
+var multiDbsConfigMap = make(map[string]map[string]interface{})
+
+// var dbConfigMap = make(map[string]interface{})
 var xYangSpecMap map[string]*yangXpathInfo
 var xDbSpecMap map[string]*dbInfo
 var xYangModSpecMap map[string]*moduleAnnotInfo
@@ -136,8 +138,8 @@ var sonicLeafRefMap map[string][]string
 func init() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGUSR2)
-	dbConfigMap = db.GetDbConfigMap()
-
+	//	dbConfigMap = db.GetDbConfigMap()
+	multiDbsConfigMap = db.GetMdbConfigMap()
 	go func() {
 		for {
 			<-sigs
@@ -1163,27 +1165,27 @@ func annotDbSpecMapFill(xDbSpecMap map[string]*dbInfo, dbXpath string, entry *ya
 							}
 						}
 					}
-			
-			case "cascade-delete":
-				fieldName := pname[len(pname)-1]
-				fieldXpath := tableName + "/" + fieldName
-				if fldXpathData, ok := xDbSpecMap[fieldXpath]; ok {
-					if fldXpathData.isKey {
-						if ext.NName() == "ENABLE" || ext.NName() == "enable" {
-							dbXpathData.cascadeDel = XFMR_ENABLE
+
+				case "cascade-delete":
+					fieldName := pname[len(pname)-1]
+					fieldXpath := tableName + "/" + fieldName
+					if fldXpathData, ok := xDbSpecMap[fieldXpath]; ok {
+						if fldXpathData.isKey {
+							if ext.NName() == "ENABLE" || ext.NName() == "enable" {
+								dbXpathData.cascadeDel = XFMR_ENABLE
+							} else {
+								dbXpathData.cascadeDel = XFMR_DISABLE
+							}
 						} else {
-							dbXpathData.cascadeDel = XFMR_DISABLE
+							log.Warningf("cascade-delete annotation is supported for sonic key leaf only. Ignoring the incorrect annotation")
 						}
-					} else {
-						log.Warningf("cascade-delete annotation is supported for sonic key leaf only. Ignoring the incorrect annotation")
 					}
-				}
-			case "key-transformer":
-				listName := pname[SONIC_TBL_CHILD_INDEX]
-				listXpath := tableName + "/" + listName
-				if listXpathData, ok := xDbSpecMap[listXpath]; ok {
-					listXpathData.xfmrKey = ext.NName()
-				}
+				case "key-transformer":
+					listName := pname[SONIC_TBL_CHILD_INDEX]
+					listXpath := tableName + "/" + listName
+					if listXpathData, ok := xDbSpecMap[listXpath]; ok {
+						listXpathData.xfmrKey = ext.NName()
+					}
 
 				case "get-namespace":
 					dbXpathData.namespaceFunc = ext.NName()

@@ -1096,14 +1096,35 @@ var td_get_namespace_xfmr GetNamespaceFunc = func(inParams XfmrParams) ([]Namesp
 
 	var result []NamespacePayload
 	for ns, pwkList := range nsPayloadMap {
-		for _, pwk := range pwkList {
-			result = append(result, NamespacePayload{
-				Namespace: ns,
-				Payloads:  []map[string]interface{}{pwk.payload},
-				Key:       pwk.key,
-				Commited:  false,
-			})
+		var mergedInstances []interface{}
+		var firstKey string
+		var listKey string
+
+		for i, pwk := range pwkList {
+			if i == 0 {
+				firstKey = pwk.key
+				for k := range pwk.payload {
+					listKey = k
+					break
+				}
+			}
+			if listVal, ok := pwk.payload[listKey]; ok {
+				if instances, ok := listVal.([]interface{}); ok {
+					mergedInstances = append(mergedInstances, instances...)
+				}
+			}
 		}
+
+		mergedMap := map[string]interface{}{
+			listKey: mergedInstances,
+		}
+
+		result = append(result, NamespacePayload{
+			Namespace: ns,
+			Payloads:  []map[string]interface{}{mergedMap},
+			Key:       firstKey,
+			Commited:  false,
+		})
 	}
 
 	log.Infof("td_get_namespace_xfmr: Final result: %+v", result)
@@ -1119,9 +1140,10 @@ func customOcGetNamespaceFunc(inParams XfmrParams) ([]NamespacePayload, error) {
 	return nameSpaceList, err
 }
 
-var terminal_device_post_xfmr PostXfmrFunc = func(inParams XfmrParams) (map[string]map[string]db.Value, error) {
+var terminal_device_post_xfmr PostXfmrFunc = func(inParams XfmrParams) error {
+
 	if inParams.dbDataMap == nil || *inParams.dbDataMap == nil {
-		return nil, fmt.Errorf("dbDataMap is nil")
+		return fmt.Errorf("dbDataMap is nil")
 	}
 
 	retDbDataMap := (*inParams.dbDataMap)[inParams.curDb]
@@ -1154,7 +1176,7 @@ var terminal_device_post_xfmr PostXfmrFunc = func(inParams XfmrParams) (map[stri
 		}
 	}
 
-	return retDbDataMap, nil
+	return nil
 }
 
 func DbToYang_ethernet_subtree_xfmr(inParams XfmrParams) error {

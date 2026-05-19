@@ -65,13 +65,19 @@ func fetchDbNameFromGlobalJson() string {
 }
 
 func GetMultiDbNames() []string {
+	// Case 1: NumAsic is 1 → return host only
+	if NumAsic == 1 {
+		return []string{"host"}
+	}
+
+	// Case 2: NumAsic > 1 → return asic DBs only
 	dbNames := []string{"host"}
 	cmnDbName := fetchDbNameFromGlobalJson()
-	if isMultiAsic() {
-		for num := 0; num < NumAsic; num++ {
-			dbNames = append(dbNames, cmnDbName+strconv.Itoa(num))
-		}
+
+	for num := 0; num < NumAsic; num++ {
+		dbNames = append(dbNames, cmnDbName+strconv.Itoa(num))
 	}
+
 	return dbNames
 }
 

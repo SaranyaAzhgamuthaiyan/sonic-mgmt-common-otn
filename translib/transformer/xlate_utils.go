@@ -619,9 +619,9 @@ func getDBOptions(dbNo db.DBNum, opts ...func(*db.Options)) db.Options {
 	var opt db.Options
 	separator := ""
 
-	if dbConfigMap != nil {
+	if multiDbsConfigMap != nil {
 		dbName := db.GetDBInstName(dbNo)
-		dbList, ok := dbConfigMap["DATABASES"].(map[string]interface{})
+		dbList, ok := multiDbsConfigMap["DATABASES"]
 		if ok {
 			dbSep, ok := dbList[dbName].(map[string]interface{})["separator"]
 			if ok {

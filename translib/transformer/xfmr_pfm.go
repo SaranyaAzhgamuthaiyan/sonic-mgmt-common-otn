@@ -172,10 +172,10 @@ var DbToYang_pfm_transceiver_key_xfmr KeyXfmrDbToYang = func(inParams XfmrParams
 	return rmap, nil
 }
 
-var pfm_post_xfmr PostXfmrFunc = func(inParams XfmrParams) (map[string]map[string]db.Value, error) {
+var pfm_post_xfmr PostXfmrFunc = func(inParams XfmrParams) error {
 
 	if inParams.dbDataMap == nil || *inParams.dbDataMap == nil {
-		return nil, fmt.Errorf("dbDataMap is nil")
+		return fmt.Errorf("dbDataMap is nil")
 	}
 
 	retDbDataMap := (*inParams.dbDataMap)[inParams.curDb]
@@ -243,5 +243,5 @@ var pfm_post_xfmr PostXfmrFunc = func(inParams XfmrParams) (map[string]map[strin
 	}
 
 	log.Infof("pfm_post_xfmr: Updated dbDataMap: %+v", retDbDataMap)
-	return retDbDataMap, nil
+	return nil
 }

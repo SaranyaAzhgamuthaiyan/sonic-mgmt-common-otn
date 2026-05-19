@@ -124,6 +124,31 @@ var test_pre_xfmr PreXfmrFunc = func(inParams XfmrParams) error {
 	return err
 }
 
+/*
+var test_post_xfmr PostXfmrFunc = func(inParams XfmrParams) (map[string]map[string]db.Value, error) {
+
+	pathInfo := NewPathInfo(inParams.uri)
+	groupId := pathInfo.Var("id")
+
+	retDbDataMap := (*inParams.dbDataMap)[inParams.curDb]
+	log.Info("Entering test_post_xfmr Request URI path = ", inParams.requestUri)
+	if inParams.oper == UPDATE {
+		xpath, _, _ := XfmrRemoveXPATHPredicates(inParams.requestUri)
+		if xpath == "/openconfig-test-xfmr:test-xfmr/test-sensor-groups/test-sensor-group/config/color-hold-time" {
+			holdTime := retDbDataMap["TEST_SENSOR_GROUP"][groupId].Field["color-hold-time"]
+			key := groupId + "|" + "sensor_type_a_post" + holdTime
+			subOpCreateMap := make(map[db.DBNum]map[string]map[string]db.Value)
+			subOpCreateMap[db.ConfigDB] = make(map[string]map[string]db.Value)
+			subOpCreateMap[db.ConfigDB]["TEST_SENSOR_A_TABLE"] = make(map[string]db.Value)
+			subOpCreateMap[db.ConfigDB]["TEST_SENSOR_A_TABLE"][key] = db.Value{Field: make(map[string]string)}
+			subOpCreateMap[db.ConfigDB]["TEST_SENSOR_A_TABLE"][key].Field["description_a"] = "Added instance in post xfmr"
+			inParams.subOpDataMap[CREATE] = &subOpCreateMap
+		}
+	}
+	return retDbDataMap, nil
+}
+*/
+
 var test_post_xfmr PostXfmrFunc = func(inParams XfmrParams) error {
 
 	pathInfo := NewPathInfo(inParams.uri)

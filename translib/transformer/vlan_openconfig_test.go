@@ -178,9 +178,9 @@ func Test_openconfig_vlan_interface(t *testing.T) {
 	t.Log("\n\n++++++++++++ CHECK STATE ATTRIBUTES ++++++++++++")
 
 	cleanuptbl := map[string]interface{}{"VLAN_TABLE": map[string]interface{}{"Vlan10": ""}}
-	unloadDB(db.ApplDB, cleanuptbl)
+	unloadDB(hostDBName, db.ApplDB, cleanuptbl)
 	pre_req_map := map[string]interface{}{"VLAN_TABLE": map[string]interface{}{"Vlan10": map[string]interface{}{"admin_status": "up", "mtu": "9000", "enabled": "true"}}}
-	loadDB(db.ApplDB, pre_req_map)
+	loadDB(hostDBName, db.ApplDB, pre_req_map)
 
 	t.Log("\n\n--- GET VLAN (state level) ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Vlan10]/state"
@@ -194,7 +194,7 @@ func Test_openconfig_vlan_interface(t *testing.T) {
 	t.Run("Test GET VLAN interface state config ", processGetRequest(url, nil, expected_get_json, false))
 	time.Sleep(1 * time.Second)
 
-	unloadDB(db.ApplDB, cleanuptbl)
+	unloadDB(hostDBName, db.ApplDB, cleanuptbl)
 }
 
 func Test_openconfig_vlan_member(t *testing.T) {
@@ -739,40 +739,40 @@ func Test_openconfig_vlan_interface_ip(t *testing.T) {
 	t.Log("\n\n++++++++++++ CHECK STATE ATTRIBUTES ++++++++++++")
 
 	cleanuptbl := map[string]interface{}{"INTF_TABLE": map[string]interface{}{"Vlan10": ""}}
-	unloadDB(db.ApplDB, cleanuptbl)
+	unloadDB(hostDBName, db.ApplDB, cleanuptbl)
 	pre_req_map := map[string]interface{}{"INTF_TABLE": map[string]interface{}{"Vlan10": map[string]interface{}{"vlan": "Vlan10"}}}
-	loadDB(db.ApplDB, pre_req_map)
+	loadDB(hostDBName, db.ApplDB, pre_req_map)
 
 	t.Log("\n\n--- GET VLAN (state level) ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Vlan10]/openconfig-vlan:routed-vlan/state"
 	expected_get_json = "{\"openconfig-vlan:state\":{\"vlan\":\"Vlan10\"}}"
 	t.Run("Test GET VLAN interface state config ", processGetRequest(url, nil, expected_get_json, false))
 	time.Sleep(1 * time.Second)
-	unloadDB(db.ApplDB, cleanuptbl)
+	unloadDB(hostDBName, db.ApplDB, cleanuptbl)
 
 	cleanuptbl = map[string]interface{}{"INTF_TABLE": map[string]interface{}{"Vlan10:4.4.5.1/32": ""}}
-	unloadDB(db.ApplDB, cleanuptbl)
+	unloadDB(hostDBName, db.ApplDB, cleanuptbl)
 	pre_req_map = map[string]interface{}{"INTF_TABLE": map[string]interface{}{"Vlan10:4.4.5.1/32": map[string]interface{}{"ip": "4.4.5.1", "prefix-length": 32}}}
-	loadDB(db.ApplDB, pre_req_map)
+	loadDB(hostDBName, db.ApplDB, pre_req_map)
 
 	t.Log("\n\n--- GET VLAN (state level) ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Vlan10]/openconfig-vlan:routed-vlan/openconfig-if-ip:ipv4/addresses/address[ip=4.4.5.1]/state"
 	expected_get_json = "{\"openconfig-if-ip:state\":{\"ip\":\"4.4.5.1\",\"prefix-length\":32}}"
 	t.Run("Test GET VLAN interface IPv4 state", processGetRequest(url, nil, expected_get_json, false))
 	time.Sleep(1 * time.Second)
-	unloadDB(db.ApplDB, cleanuptbl)
+	unloadDB(hostDBName, db.ApplDB, cleanuptbl)
 
 	cleanuptbl = map[string]interface{}{"INTF_TABLE": map[string]interface{}{"Vlan10:2001:4860:4860::8844/64": ""}}
-	unloadDB(db.ApplDB, cleanuptbl)
+	unloadDB(hostDBName, db.ApplDB, cleanuptbl)
 	pre_req_map = map[string]interface{}{"INTF_TABLE": map[string]interface{}{"Vlan10:2001:4860:4860::8844/64": map[string]interface{}{"ip": "2001:4860:4860::8844", "prefix-length": 64}}}
-	loadDB(db.ApplDB, pre_req_map)
+	loadDB(hostDBName, db.ApplDB, pre_req_map)
 
 	t.Log("\n\n--- GET VLAN (state level) ---")
 	url = "/openconfig-interfaces:interfaces/interface[name=Vlan10]/openconfig-vlan:routed-vlan/openconfig-if-ip:ipv6/addresses/address[ip=2001:4860:4860::8844]/state"
 	expected_get_json = "{\"openconfig-if-ip:state\":{\"ip\":\"2001:4860:4860::8844\",\"prefix-length\":64}}"
 	t.Run("Test GET VLAN interface IPv6 state", processGetRequest(url, nil, expected_get_json, false))
 	time.Sleep(1 * time.Second)
-	unloadDB(db.ApplDB, cleanuptbl)
+	unloadDB(hostDBName, db.ApplDB, cleanuptbl)
 
 	t.Log("\n\n++++++++++++ CLEAN UP VLAN INTERFACES IP CONFIG ++++++++++++")
 

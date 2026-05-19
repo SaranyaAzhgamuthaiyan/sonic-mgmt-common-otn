@@ -2,7 +2,6 @@ package transformer
 
 import (
 	"errors"
-	"github.com/Azure/sonic-mgmt-common/translib/db"
 	log "github.com/golang/glog"
 	"strings"
 )
@@ -12,13 +11,6 @@ func init() {
 	XlateFuncBind("DbToYang_oc_name_key_xfmr", DbToYang_oc_name_key_xfmr)
 	XlateFuncBind("YangToDb_oc_name_field_xfmr", YangToDb_oc_name_field_xfmr)
 	XlateFuncBind("DbToYang_oc_name_field_xfmr", DbToYang_oc_name_field_xfmr)
-	XlateFuncBind("YangToDb_ocm_channel_key_xfmr", YangToDb_ocm_channel_key_xfmr)
-	XlateFuncBind("DbToYang_ocm_channel_key_xfmr", DbToYang_ocm_channel_key_xfmr)
-	XlateFuncBind("YangToDb_ocm_lower_frequency_xfmr", YangToDb_ocm_lower_frequency_xfmr)
-	XlateFuncBind("YangToDb_osc_key_xfmr", YangToDb_osc_key_xfmr)
-	XlateFuncBind("DbToYang_osc_key_xfmr", DbToYang_osc_key_xfmr)
-	XlateFuncBind("YangToDb_osc_interface_xfmr", YangToDb_osc_interface_xfmr)
-	XlateFuncBind("DbToYang_osc_interface_xfmr", DbToYang_osc_interface_xfmr)
 	XlateFuncBind("otn_table_xfmr", otn_table_xfmr)
 }
 
@@ -58,113 +50,6 @@ var DbToYang_oc_name_field_xfmr FieldXfmrDbtoYang = func(inParams XfmrParams) (m
 	var err error
 	rmap := make(map[string]interface{})
 	rmap["name"] = inParams.key
-
-	return rmap, err
-}
-
-// OCM Channel KeyXfmrs
-var YangToDb_ocm_channel_key_xfmr KeyXfmrYangToDb = func(inParams XfmrParams) (string, error) {
-	if log.V(3) {
-		log.Info("YangToDb_ocm_key_xfmr: root: ", inParams.ygRoot,
-			", uri: ", inParams.uri)
-	}
-	pathInfo := NewPathInfo(inParams.uri)
-	name := pathInfo.Var("name")
-	lower := pathInfo.Var("lower-frequency")
-	key := name + "|" + lower
-
-	return key, nil
-}
-
-var DbToYang_ocm_channel_key_xfmr KeyXfmrDbToYang = func(inParams XfmrParams) (map[string]interface{}, error) {
-	rmap := make(map[string]interface{})
-	tableKeys := strings.Split(inParams.key, "|")
-
-	if len(tableKeys) >= 2 {
-		rmap["lower-frequency"] = tableKeys[1]
-	}
-
-	tableName := ""
-	if strings.Contains(inParams.uri, "channels/channel") {
-		tableName = "OTN_OCM_CHANNEL_TABLE"
-	}
-
-	upperFreq := ""
-
-	// 1. Try Cache
-	if inParams.dbDataMap != nil && tableName != "" {
-		if tblData, ok := (*inParams.dbDataMap)[inParams.curDb][tableName]; ok {
-			if row, ok2 := tblData[inParams.key]; ok2 {
-				upperFreq = row.Field["upper-frequency"]
-			}
-		}
-	}
-
-	// 2. Direct Redis Fetch (fixes the undefined: db error and the type mismatch)
-	if upperFreq == "" && tableName != "" {
-		ts := &db.TableSpec{Name: tableName}
-		// Using Comp for composite keys allows the driver to handle the '|' separator correctly
-		rowKey := db.Key{Comp: strings.Split(inParams.key, "|")}
-
-		entry, err := inParams.dbs[inParams.curDb].GetEntry(ts, rowKey)
-		if err == nil {
-			upperFreq = entry.Field["upper-frequency"]
-		}
-	}
-
-	if upperFreq != "" {
-		rmap["upper-frequency"] = upperFreq
-	} else {
-		log.Warningf("DbToYang_ocm_channel_key_xfmr: Could not resolve upper-frequency for %s", inParams.key)
-	}
-
-	return rmap, nil
-}
-
-var YangToDb_ocm_lower_frequency_xfmr FieldXfmrYangToDb = func(inParams XfmrParams) (map[string]string, error) {
-	var err error
-	rmap := make(map[string]string)
-
-	rmap["NULL"] = "NULL"
-
-	return rmap, err
-}
-
-// OSC Interface KeyXfmrs
-var YangToDb_osc_key_xfmr KeyXfmrYangToDb = func(inParams XfmrParams) (string, error) {
-	if log.V(3) {
-		log.Info("YangToDb_osc_key_xfmr: root: ", inParams.ygRoot,
-			", uri: ", inParams.uri)
-	}
-	pathInfo := NewPathInfo(inParams.uri)
-	osckey := pathInfo.Var("interface")
-
-	return osckey, nil
-}
-
-var DbToYang_osc_key_xfmr KeyXfmrDbToYang = func(inParams XfmrParams) (map[string]interface{}, error) {
-	res_map := make(map[string]interface{}, 1)
-	var err error
-
-	if log.V(3) {
-		log.Info("DbToYang_osc_key_xfmr: ", inParams.key)
-	}
-
-	res_map["interface"] = inParams.key
-
-	return res_map, err
-}
-
-var YangToDb_osc_interface_xfmr FieldXfmrYangToDb = func(inParams XfmrParams) (map[string]string, error) {
-	res_map := make(map[string]string)
-	var err error
-	return res_map, err
-}
-
-var DbToYang_osc_interface_xfmr FieldXfmrDbtoYang = func(inParams XfmrParams) (map[string]interface{}, error) {
-	var err error
-	rmap := make(map[string]interface{})
-	rmap["interface"] = inParams.key
 
 	return rmap, err
 }

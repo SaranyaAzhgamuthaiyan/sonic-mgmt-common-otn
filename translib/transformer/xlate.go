@@ -897,7 +897,6 @@ func SortSncTableDbKeys(tableName string, dbKeyMap map[string]db.Value) []string
 	return ordDbKey
 }
 
-
 func IsDependentChildTable(depChildTbl string, parentTbl string, uriModuleNm string) bool {
 	/* This function checks if the input table(depChildTbl) is a dependent child of parentTbl
 	   across sonic modules based on CVL provided dependency info.

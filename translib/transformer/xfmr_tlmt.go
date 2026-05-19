@@ -510,22 +510,22 @@ func deleteTables(inParams XfmrParams) error {
 	return nil
 }
 
-var telemetry_client_sync_post_xfmr PostXfmrFunc = func(inParams XfmrParams) (map[string]map[string]db.Value, error) {
+var telemetry_client_sync_post_xfmr PostXfmrFunc = func(inParams XfmrParams) error {
 
+	// Get current DB map
 	retDbDataMap := (*inParams.dbDataMap)[inParams.curDb]
-	var sensorGroupId string
-	var destinationGroupId string
-	var subscriptionName string
 
-	log.V(3).Info(" telemetry_client_sync_post_xfmr:Entering  Request URI path = ", inParams.requestUri)
+	log.V(3).Info(" telemetry_client_sync_post_xfmr: Entering Request URI path = ", inParams.requestUri)
+
+	// DELETE operation
 	if inParams.oper == DELETE {
-		err := deleteTables(inParams)
-		if err != nil {
-			return retDbDataMap, err
+		if err := deleteTables(inParams); err != nil {
+			return err
 		}
-		return retDbDataMap, nil
+		return nil
 	}
 
+	// Ensure TELEMETRY_CLIENT_TBL exists
 	if retDbDataMap[TELEMETRY_CLIENT_TBL] == nil {
 		retDbDataMap[TELEMETRY_CLIENT_TBL] = make(map[string]db.Value)
 	}
@@ -533,87 +533,85 @@ var telemetry_client_sync_post_xfmr PostXfmrFunc = func(inParams XfmrParams) (ma
 	// Populating TELEMTRY_CLIENT|Global configurations
 	populateTelemetryGlobal(retDbDataMap)
 
+	// SENSOR-GROUPS processing
 	if strings.Contains(inParams.requestUri, "sensor-groups") {
-
-		for sensorGroupId, _ := range retDbDataMap[SENSOR_GROUP_TBL] {
+		for sensorGroupId := range retDbDataMap[SENSOR_GROUP_TBL] {
 			log.V(3).Infof(" telemetry_client_sync_post_xfmr:sensorGroupId:%v ", sensorGroupId)
+
 			sensorPaths := retDbDataMap[SENSOR_GROUP_TBL][sensorGroupId].Field["sensor-paths"]
 			log.V(3).Infof("telemetry_client_sync_post_xfmr:Sensor Group paths: %v", sensorPaths)
 			// Populating TELEMETRY_CLIENT table with sensor-group data
 			processSensorGroup(retDbDataMap, sensorGroupId, sensorPaths)
-
 		}
 	}
-	if strings.Contains(inParams.requestUri, "subscriptions") {
 
+	// SUBSCRIPTIONS processing
+	if strings.Contains(inParams.requestUri, "subscriptions") {
 		log.V(3).Infof(" telemetry_client_sync_post_xfmr:retDbDataMap:%v", retDbDataMap)
 		// Fetching SENSOR_GROUP table keys
 		sensorGroupTs := &db.TableSpec{Name: SENSOR_GROUP_TBL}
-		sensorGroupKeys, sensorGrpKeyserr := inParams.d.GetKeys(sensorGroupTs)
-		if sensorGrpKeyserr != nil {
-			return retDbDataMap, sensorGrpKeyserr
+		sensorGroupKeys, err := inParams.d.GetKeys(sensorGroupTs)
+		if err != nil {
+			return err
 		}
 
-		for key := range sensorGroupKeys {
-			log.V(3).Infof(" telemetry_client_sync_post_xfmr:sensor_group_keys:%v ", sensorGroupKeys[key].Get(0))
-			sensorGroupId = sensorGroupKeys[key].Get(0)
-			sensorGroupEntry, sensorGrpEntryerr := inParams.d.GetEntry(sensorGroupTs, sensorGroupKeys[key])
-			if sensorGrpEntryerr != nil {
-				return retDbDataMap, sensorGrpEntryerr
+		for _, sgKey := range sensorGroupKeys {
+			sensorGroupId := sgKey.Get(0)
+			sensorGroupEntry, err := inParams.d.GetEntry(sensorGroupTs, sgKey)
+			if err != nil {
+				return err
 			}
+
 			sensorPaths := sensorGroupEntry.Get("sensor-paths")
-			log.V(3).Infof("telemetry_client_sync_post_xfmr:Sensor Group paths: %v", sensorPaths)
-			if sensorGroupId != "" && sensorPaths != "" {
-				// Forming key for TELEMETRY_CLIENT table
-				tclientKey := "Subscription_" + sensorGroupId
-				log.V(3).Info(" telemetry_client_sync_post_xfmr:tclientKey ", tclientKey)
+			tclientKey := "Subscription_" + sensorGroupId
 
-				for key, _ := range retDbDataMap[SENSOR_PROFILE_TBL] {
-					if strings.Contains(key, sensorGroupId) {
+			for profileKey := range retDbDataMap[SENSOR_PROFILE_TBL] {
+				if strings.Contains(profileKey, sensorGroupId) {
+					parts := strings.Split(profileKey, "|")
+					subscriptionName := parts[0]
 
-						parts := strings.Split(key, "|")
-						subscriptionName = parts[0]
+					processSensorGroup(retDbDataMap, sensorGroupId, sensorPaths)
+					log.V(3).Infof("telemetry_client_sync_post_xfmr: sensor_paths: %v", retDbDataMap[TELEMETRY_CLIENT_TBL][tclientKey].Field["paths"])
 
-						processSensorGroup(retDbDataMap, sensorGroupId, sensorPaths)
-						log.V(3).Infof(" telemetry_client_sync_post_xfmr: sensor_paths:%v", retDbDataMap[TELEMETRY_CLIENT_TBL][tclientKey].Field["paths"])
+					sampleInterval := retDbDataMap[SENSOR_PROFILE_TBL][profileKey].Field["sample-interval"]
+					heartbeatInterval := retDbDataMap[SENSOR_PROFILE_TBL][profileKey].Field["heartbeat-interval"]
 
-						sample_interval := retDbDataMap[SENSOR_PROFILE_TBL][key].Field["sample-interval"]
-						heartbeat_interval := retDbDataMap[SENSOR_PROFILE_TBL][key].Field["heartbeat-interval"]
-						log.V(3).Infof(" telemetry_client_sync_post_xfmr: sample_interval:%v, heartbeat_interval:%v", sample_interval, heartbeat_interval)
+					log.V(3).Infof(" telemetry_client_sync_post_xfmr: sample_interval: %v, heartbeat_interval: %v", sampleInterval, heartbeatInterval)
 
-						// Populating TELEMETRY_CLIENT table with subscription data
-						err := processSubscriptions(retDbDataMap, sensorGroupId, subscriptionName, sample_interval, heartbeat_interval)
-						if err != nil {
-							log.Errorf("Error returned from processSubscriptions :%v", err)
-							return retDbDataMap, err
-						}
-
+					if err := processSubscriptions(
+						retDbDataMap,
+						sensorGroupId,
+						subscriptionName,
+						sampleInterval,
+						heartbeatInterval,
+					); err != nil {
+						log.Errorf("Error returned from processSubscriptions: %v", err)
+						return err
 					}
-
 				}
 			}
 		}
-
 	}
 
+	// DESTINATION-GROUPS processing
 	if strings.Contains(inParams.requestUri, "destination-groups") {
-		for key, _ := range retDbDataMap[DESTINATION_TBL] {
+		for destKey := range retDbDataMap[DESTINATION_TBL] {
+			parts := strings.Split(destKey, "|")
+			if len(parts) < 3 {
+				continue
+			}
 
-			parts := strings.Split(key, "|")
-			destinationGroupId = parts[0]
+			destinationGroupId := parts[0]
 			destinationGroupAddress := parts[1]
 			destinationGroupPort := parts[2]
 
-			log.V(3).Infof(" telemetry_client_sync_post_xfmr:destinationKeys:%v,%v,%v ", destinationGroupId, destinationGroupAddress, destinationGroupPort)
+			log.V(3).Infof(" telemetry_client_sync_post_xfmr: destinationKeys: %v, %v, %v", destinationGroupId, destinationGroupAddress, destinationGroupPort)
 
-			// Populating TELEMETRY_CLIENT table with destinations
 			processDestinationGroup(retDbDataMap, destinationGroupId, destinationGroupAddress, destinationGroupPort)
-
 		}
-
 	}
-	log.V(3).Infof(" telemetry_client_sync_post_xfmr:retDbDataMap:%v", retDbDataMap)
 
-	return retDbDataMap, nil
+	log.V(3).Infof(" telemetry_client_sync_post_xfmr: retDbDataMap:%v", retDbDataMap)
 
+	return nil
 }

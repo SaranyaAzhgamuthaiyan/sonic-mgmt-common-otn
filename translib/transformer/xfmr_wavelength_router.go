@@ -311,34 +311,56 @@ var media_channel_get_namespace_xfmr GetNamespaceFunc = func(inParams XfmrParams
 	// Construct final result
 	var result []NamespacePayload
 	for ns, pwkList := range nsPayloadMap {
-		for _, pwk := range pwkList {
-			result = append(result, NamespacePayload{
-				Namespace: ns,                                    //asic0
-				Payloads:  []map[string]interface{}{pwk.payload}, //payload from payloadWithKey struct
-				Key:       pwk.key,                               // key from payloadWithkey struct
-				Commited:  false,                                 // commited flag as a false
-			})
+		var mergedInstances []interface{}
+		var firstKey string
+		var listKey string
+
+		for i, pwk := range pwkList {
+			if i == 0 {
+				firstKey = pwk.key
+				for k := range pwk.payload {
+					listKey = k
+					break
+				}
+			}
+			if listVal, ok := pwk.payload[listKey]; ok {
+				if instances, ok := listVal.([]interface{}); ok {
+					mergedInstances = append(mergedInstances, instances...)
+				}
+			}
 		}
+
+		mergedMap := map[string]interface{}{
+			listKey: mergedInstances,
+		}
+
+		result = append(result, NamespacePayload{
+			Namespace: ns,
+			Payloads:  []map[string]interface{}{mergedMap},
+			Key:       firstKey,
+			Commited:  false,
+		})
 	}
 
 	return result, nil
 }
 
-var media_channel_post_xfmr PostXfmrFunc = func(inParams XfmrParams) (map[string]map[string]db.Value, error) {
-
-	retDbDataMap := (*inParams.dbDataMap)[inParams.curDb]
-	pathInfo := NewPathInfo(inParams.uri)
-	index := pathInfo.Var("index")
-	lowerFrequency := pathInfo.Var("lower-frequency")
-	upperFrequency := pathInfo.Var("upper-frequency")
+var media_channel_post_xfmr PostXfmrFunc = func(inParams XfmrParams) error {
 
 	if inParams.dbDataMap == nil || *inParams.dbDataMap == nil {
-		return nil, fmt.Errorf("dbDataMap is nil")
+		return fmt.Errorf("dbDataMap is nil")
 	}
+
+	retDbDataMap := (*inParams.dbDataMap)[inParams.curDb]
 	if retDbDataMap == nil {
 		retDbDataMap = make(map[string]map[string]db.Value)
 		(*inParams.dbDataMap)[inParams.curDb] = retDbDataMap
 	}
+
+	pathInfo := NewPathInfo(inParams.uri)
+	index := pathInfo.Var("index")
+	lowerFrequency := pathInfo.Var("lower-frequency")
+	upperFrequency := pathInfo.Var("upper-frequency")
 
 	if inParams.oper == DELETE {
 
@@ -346,18 +368,18 @@ var media_channel_post_xfmr PostXfmrFunc = func(inParams XfmrParams) (map[string
 			retDbDataMap["MEDIA_CHANNEL_DISTRIBUTION"] = make(map[string]db.Value)
 		}
 
-		if lowerFrequency == "" && upperFrequency == "" && index != "" {
+		if lowerFrequency != "" && upperFrequency != "" && index != "" {
 			mediaChannelTs := &db.TableSpec{Name: "MEDIA_CHANNEL_DISTRIBUTION"}
 			mediaChannelKeys, err := inParams.d.GetKeys(mediaChannelTs)
-			log.Infof("media_channel_get_namespace_xfmr: ", mediaChannelKeys)
+			log.Infof("media_channel_get_namespace_xfmr: %v", mediaChannelKeys)
 			if err != nil {
 				log.Errorf("Error retrieving keys from MEDIA_CHANNEL table: %v", err)
-				return retDbDataMap, err
+				return err
 			}
-			mediaChannelDistributionKeys := []string{}
 
+			mediaChannelDistributionKeys := []string{}
 			for key := range mediaChannelKeys {
-				log.Infof("media_channel_get_namespace_xfmr: ", index, mediaChannelKeys[key].Get(0), mediaChannelKeys[key])
+				log.Infof("media_channel_get_namespace_xfmr: %v %v %v", index, mediaChannelKeys[key].Get(0), mediaChannelKeys[key])
 				if index == mediaChannelKeys[key].Get(0) {
 					mediaChannelDistribution := ""
 					for idx, mediaKeyValue := range mediaChannelKeys[key].Comp {
@@ -370,30 +392,55 @@ var media_channel_post_xfmr PostXfmrFunc = func(inParams XfmrParams) (map[string
 					mediaChannelDistributionKeys = append(mediaChannelDistributionKeys, mediaChannelDistribution)
 				}
 			}
-			log.Info("media_channel_get_namespace_xfmr: ", mediaChannelDistributionKeys)
 
-			tableTs := &db.TableSpec{Name: "MEDIA_CHANNEL_DISTRIBUTION"}
-			_ = tableTs
-			for _, DistrubutionKey := range mediaChannelDistributionKeys {
+			for _, distributionKey := range mediaChannelDistributionKeys {
+				// Mark specific key for deletion
+				retDbDataMap["MEDIA_CHANNEL_DISTRIBUTION"][distributionKey] = db.Value{}
+			}
 
-				// Mark specific key for deletion in the return DB map
-				retDbDataMap["MEDIA_CHANNEL_DISTRIBUTION"][DistrubutionKey] = db.Value{}
+			log.Infof("media_channel_post_xfmr: marked delete for index=%s in MEDIA_CHANNEL_DISTRIBUTION", index)
+
+		} else if lowerFrequency == "" && upperFrequency == "" && index != "" {
+			mediaChannelTs := &db.TableSpec{Name: "MEDIA_CHANNEL_DISTRIBUTION"}
+			mediaChannelKeys, err := inParams.d.GetKeys(mediaChannelTs)
+			log.Infof("media_channel_get_namespace_xfmr: %v", mediaChannelKeys)
+			if err != nil {
+				log.Errorf("Error retrieving keys from MEDIA_CHANNEL table: %v", err)
+				return err
+			}
+
+			mediaChannelDistributionKeys := []string{}
+			for key := range mediaChannelKeys {
+				log.Infof("media_channel_get_namespace_xfmr: %v %v %v", index, mediaChannelKeys[key].Get(0), mediaChannelKeys[key])
+				if index == mediaChannelKeys[key].Get(0) {
+					mediaChannelDistribution := ""
+					for idx, mediaKeyValue := range mediaChannelKeys[key].Comp {
+						if idx == len(mediaChannelKeys[key].Comp)-1 {
+							mediaChannelDistribution += mediaKeyValue
+						} else {
+							mediaChannelDistribution += mediaKeyValue + "|"
+						}
+					}
+					mediaChannelDistributionKeys = append(mediaChannelDistributionKeys, mediaChannelDistribution)
+				}
+			}
+
+			for _, distributionKey := range mediaChannelDistributionKeys {
+				// Mark specific key for deletion
+				retDbDataMap["MEDIA_CHANNEL_DISTRIBUTION"][distributionKey] = db.Value{}
 			}
 
 			log.Infof("media_channel_post_xfmr: marked delete for index=%s in MEDIA_CHANNEL_DISTRIBUTION", index)
 
 		} else {
 			log.Info("media_channel_post_xfmr:Deleting all entries in MEDIA_CHANNEL_DISTRIBUTION table")
-
-			tableTs := &db.TableSpec{Name: "MEDIA_CHANNEL_DISTRIBUTION"}
-			_ = tableTs
 			// Reset per-table map to indicate delete-all
 			retDbDataMap["MEDIA_CHANNEL_DISTRIBUTION"] = make(map[string]db.Value)
 		}
 	}
 
 	log.Infof("media_channel_post_xfmr:retDbDataMap:%v", retDbDataMap)
-	return retDbDataMap, nil
+	return nil
 }
 
 // Define a new implementation for GetNamespaceFunc

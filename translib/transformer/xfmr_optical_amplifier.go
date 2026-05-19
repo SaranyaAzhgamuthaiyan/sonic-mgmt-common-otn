@@ -363,27 +363,6 @@ var DbToYang_oa_counter_laser_bias_key_xfmr KeyXfmrDbToYang = func(inParams Xfmr
 	return rmap, err
 }
 
-var YangToDb_osc_key_xfmr KeyXfmrYangToDb = func(inParams XfmrParams) (string, error) {
-
-	log.V(3).Infof("YangToDb_osc_interface_xfmr: root: ", inParams.ygRoot,
-		", uri: ", inParams.uri)
-	pathInfo := NewPathInfo(inParams.uri)
-
-	osckey := pathInfo.Var("interface")
-	log.V(3).Infof("YangToDb_osc_interface_xfmr:osckey:", osckey)
-
-	return osckey, nil
-}
-
-var DbToYang_osc_key_xfmr KeyXfmrDbToYang = func(inParams XfmrParams) (map[string]interface{}, error) {
-
-	rmap := make(map[string]interface{}, 1)
-	log.V(3).Info("DbToYang_osc_interface_xfmr: ", inParams.key)
-	rmap["interface"] = inParams.key
-
-	return rmap, nil
-}
-
 var YangToDb_osc_interface_field_xfmr FieldXfmrYangToDb = func(inParams XfmrParams) (map[string]string, error) {
 
 	rmap := make(map[string]string)
@@ -470,6 +449,30 @@ var DbToYang_osc_laser_bias_current_counter_key_xfmr KeyXfmrDbToYang = func(inPa
 	rmap, err := oscNameKeyDbToYang(inParams)
 
 	return rmap, err
+}
+
+var YangToDb_osc_key_xfmr KeyXfmrYangToDb = func(inParams XfmrParams) (string, error) {
+	if log.V(3) {
+		log.Info("YangToDb_osc_key_xfmr: root: ", inParams.ygRoot,
+			", uri: ", inParams.uri)
+	}
+	pathInfo := NewPathInfo(inParams.uri)
+	osckey := pathInfo.Var("interface")
+
+	return osckey, nil
+}
+
+var DbToYang_osc_key_xfmr KeyXfmrDbToYang = func(inParams XfmrParams) (map[string]interface{}, error) {
+	res_map := make(map[string]interface{}, 1)
+	var err error
+
+	if log.V(3) {
+		log.Info("DbToYang_osc_key_xfmr: ", inParams.key)
+	}
+
+	res_map["interface"] = inParams.key
+
+	return res_map, err
 }
 
 func getAmplifierRootObj(s *ygot.GoStruct) *ocbinds.OpenconfigOpticalAmplifier_OpticalAmplifier {
@@ -633,14 +636,35 @@ var oa_name_get_namespace_xfmr GetNamespaceFunc = func(inParams XfmrParams) ([]N
 	// Construct final result
 	var result []NamespacePayload
 	for ns, pwkList := range nsPayloadMap {
-		for _, pwk := range pwkList {
-			result = append(result, NamespacePayload{
-				Namespace: ns,
-				Payloads:  []map[string]interface{}{pwk.payload},
-				Key:       pwk.key,
-				Commited:  false,
-			})
+		var mergedInstances []interface{}
+		var firstKey string
+		var listKey string
+
+		for i, pwk := range pwkList {
+			if i == 0 {
+				firstKey = pwk.key
+				for k := range pwk.payload {
+					listKey = k
+					break
+				}
+			}
+			if listVal, ok := pwk.payload[listKey]; ok {
+				if instances, ok := listVal.([]interface{}); ok {
+					mergedInstances = append(mergedInstances, instances...)
+				}
+			}
 		}
+
+		mergedMap := map[string]interface{}{
+			listKey: mergedInstances,
+		}
+
+		result = append(result, NamespacePayload{
+			Namespace: ns,
+			Payloads:  []map[string]interface{}{mergedMap},
+			Key:       firstKey,
+			Commited:  false,
+		})
 	}
 
 	return result, nil

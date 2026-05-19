@@ -59,35 +59,6 @@ var DbToYang_ocm_name_key_xfmr KeyXfmrDbToYang = func(inParams XfmrParams) (map[
 	return rmap, nil
 }
 
-var YangToDb_ocm_channel_key_xfmr KeyXfmrYangToDb = func(inParams XfmrParams) (string, error) {
-
-	log.V(3).Info("YangToDb_ocm_key_xfmr: root: ", inParams.ygRoot,
-		", uri: ", inParams.uri)
-	pathInfo := NewPathInfo(inParams.uri)
-
-	name := pathInfo.Var("name")
-	lower := pathInfo.Var("lower-frequency")
-	upper := pathInfo.Var("upper-frequency")
-	key := name + "|" + lower + "|" + upper
-
-	return key, nil
-}
-
-var DbToYang_ocm_channel_key_xfmr KeyXfmrDbToYang = func(inParams XfmrParams) (map[string]interface{}, error) {
-
-	rmap := make(map[string]interface{})
-	key := inParams.key
-
-	TableKeys := strings.Split(key, "|")
-	if len(TableKeys) >= 3 {
-		rmap["lower-frequency"] = TableKeys[1]
-		rmap["upper-frequency"] = TableKeys[2]
-	}
-	log.V(3).Info("DbToYang_ocm_channel_key_xfmr : rmap ", rmap)
-
-	return rmap, nil
-}
-
 var YangToDb_ocm_lower_frequency_field_xfmr FieldXfmrYangToDb = func(inParams XfmrParams) (map[string]string, error) {
 
 	rmap := make(map[string]string)
@@ -126,6 +97,35 @@ var DbToYang_ocm_upper_frequency_field_xfmr FieldXfmrDbtoYang = func(inParams Xf
 	if len(TableKeys) >= 2 {
 		rmap["upper-frequency"] = TableKeys[2]
 	}
+
+	return rmap, nil
+}
+
+var YangToDb_ocm_channel_key_xfmr KeyXfmrYangToDb = func(inParams XfmrParams) (string, error) {
+
+	log.V(3).Info("YangToDb_ocm_key_xfmr: root: ", inParams.ygRoot,
+		", uri: ", inParams.uri)
+	pathInfo := NewPathInfo(inParams.uri)
+
+	name := pathInfo.Var("name")
+	lower := pathInfo.Var("lower-frequency")
+	upper := pathInfo.Var("upper-frequency")
+	key := name + "|" + lower + "|" + upper
+
+	return key, nil
+}
+
+var DbToYang_ocm_channel_key_xfmr KeyXfmrDbToYang = func(inParams XfmrParams) (map[string]interface{}, error) {
+
+	rmap := make(map[string]interface{})
+	key := inParams.key
+
+	TableKeys := strings.Split(key, "|")
+	if len(TableKeys) >= 3 {
+		rmap["lower-frequency"] = TableKeys[1]
+		rmap["upper-frequency"] = TableKeys[2]
+	}
+	log.V(3).Info("DbToYang_ocm_channel_key_xfmr : rmap ", rmap)
 
 	return rmap, nil
 }
@@ -258,14 +258,35 @@ var ocm_get_namespace_xfmr GetNamespaceFunc = func(inParams XfmrParams) ([]Names
 	// Construct final result
 	var result []NamespacePayload
 	for ns, pwkList := range nsPayloadMap {
-		for _, pwk := range pwkList {
-			result = append(result, NamespacePayload{
-				Namespace: ns,                                    //asic0
-				Payloads:  []map[string]interface{}{pwk.payload}, //payload from payloadWithKey struct
-				Key:       pwk.key,                               // key from payloadWithkey struct
-				Commited:  false,                                 // commited flag as a false
-			})
+		var mergedInstances []interface{}
+		var firstKey string
+		var listKey string
+
+		for i, pwk := range pwkList {
+			if i == 0 {
+				firstKey = pwk.key
+				for k := range pwk.payload {
+					listKey = k
+					break
+				}
+			}
+			if listVal, ok := pwk.payload[listKey]; ok {
+				if instances, ok := listVal.([]interface{}); ok {
+					mergedInstances = append(mergedInstances, instances...)
+				}
+			}
 		}
+
+		mergedMap := map[string]interface{}{
+			listKey: mergedInstances,
+		}
+
+		result = append(result, NamespacePayload{
+			Namespace: ns,
+			Payloads:  []map[string]interface{}{mergedMap},
+			Key:       firstKey,
+			Commited:  false,
+		})
 	}
 
 	return result, nil

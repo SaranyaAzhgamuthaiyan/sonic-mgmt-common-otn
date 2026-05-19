@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/Azure/sonic-mgmt-common/cvl"
@@ -387,8 +388,12 @@ func init() {
 	var err error
 	configDb = make(map[string]*db.DB)
 
-	if IsMultiAsic() {
-		MdbNames = append(MdbNames, "asic0")
+	if NumAsic == 1 {
+		MdbNames = append(MdbNames, "host")
+	} else {
+		for i := 0; i < NumAsic; i++ {
+			MdbNames = append(MdbNames, "asic"+strconv.Itoa(i))
+		}
 	}
 
 	for _, dbName := range MdbNames {
