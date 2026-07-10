@@ -427,6 +427,45 @@ func (app *CommonApp) processDelete(d *db.DB) (SetResponse, error) {
 	return resp, err
 }
 
+func (app *CommonApp) processCVLValidate(d *db.DB) error {
+	if len(app.cmnAppTableMap) == 0 {
+		log.Infof("processCVLValidate: cmnAppTableMap empty, skipping CVL for namespace=%s", d.Opts.MDBName)
+		return nil
+	}
+
+	//shows what tables are about to be validated
+	for opcode, dbNumMap := range app.cmnAppTableMap {
+		for _, tblMap := range dbNumMap {
+			for tblName, keyMap := range tblMap {
+				log.Infof("processCVLValidate: will validate opcode=%d table=%s keys=%v",
+					opcode, tblName, func() []string {
+						keys := make([]string, 0, len(keyMap))
+						for k := range keyMap {
+							keys = append(keys, k)
+						}
+						return keys
+					}())
+			}
+		}
+	}
+
+	d.SetValidateOnly(true)
+	defer func() {
+		log.Infof("processCVLValidate: restoring ValidateOnly=false for namespace=%s", d.Opts.MDBName)
+		d.SetValidateOnly(false)
+	}()
+
+	err := app.processCommon(d, app.cmnAppOpcode)
+
+	if err != nil {
+		log.Warningf("processCVLValidate: failed for namespace %s: %v", d.Opts.MDBName, err)
+		return err
+	}
+
+	log.Infof("processCVLValidate: passed for namespace %s", d.Opts.MDBName)
+	return nil
+}
+
 func (app *CommonApp) processGet(dbs [db.MaxDB]*db.DB, fmtType TranslibFmtType) (GetResponse, error) {
 	var err error
 	var resp GetResponse
@@ -662,6 +701,7 @@ func (app *CommonApp) processCommon(d *db.DB, opcode int) error {
 
 	// Handle delete first if any available
 	if _, ok := app.cmnAppTableMap[DELETE][db.ConfigDB]; ok {
+
 		err = app.cmnAppDelDbOpn(d, DELETE, app.cmnAppTableMap[DELETE][db.ConfigDB])
 		if err != nil {
 			log.Info("Process delete fail. cmnAppDelDbOpn error:", err)
@@ -1118,8 +1158,18 @@ func (app *CommonApp) processTableDeleteForReplace(d *db.DB, parentTblNm string,
 							}
 						}
 					}
+					existingEntry, exstErr := d.GetEntry(childTblSpec, db.Key{Comp: []string{childTblKey}})
+					if exstErr != nil || !existingEntry.IsPopulated() {
+						log.Infof("processDeleteForReplace: child key %v|%v not in Db, skipping delete", childTblNm, childTblKey)
+						continue
+					}
 					err = d.DeleteEntry(childTblSpec, db.Key{Comp: []string{childTblKey}})
 					if err != nil {
+						if cvl.CVLRetCode(err.(tlerr.TranslibCVLFailure).Code) == cvl.CVL_SEMANTIC_KEY_NOT_EXIST {
+							log.Infof("Ignore delete for non-existent child entry table %v key %v in REPLACE flow: %v", childTblNm, childTblKey, err.(tlerr.TranslibCVLFailure).CVLErrorInfo.ConstraintErrMsg)
+							err = nil
+							continue
+						}
 						log.Warning("DELETE for REPLACE case - d.DeleteEntry() failure")
 						return err
 					}
@@ -1235,20 +1285,30 @@ func (app *CommonApp) handleChildDeleteForOcReplaceAndDelete(d *db.DB, sortedDel
 				if err != nil {
 					return err
 				}
-			}
-			for _, tableKey := range parentKeysList {
-				log.V(4).Info("Delete parent entry ", cmnAppTs, db.Key{Comp: []string{tableKey}})
-				err = d.DeleteEntry(cmnAppTs, db.Key{Comp: []string{tableKey}})
-				if err != nil {
-					if cvl.CVLRetCode(err.(tlerr.TranslibCVLFailure).Code) == cvl.CVL_SEMANTIC_KEY_NOT_EXIST {
-						log.V(4).Infof("Ignore delete that cannot be processed for table %v key %v that does not exist. err %v", tblNm, tableKey, err.(tlerr.TranslibCVLFailure).CVLErrorInfo.ConstraintErrMsg)
-						err = nil
-					} else {
-						log.Warning("DELETE case - d.DeleteEntry() failure")
-						return err
+
+				if !d.GetTxValidateOnly() {
+					for _, tableKey := range parentKeysList {
+						log.V(4).Info("Delete parent entry ", cmnAppTs, db.Key{Comp: []string{tableKey}})
+						existingEntry, exstErr := d.GetEntry(cmnAppTs, db.Key{Comp: []string{tableKey}})
+						if exstErr != nil || !existingEntry.IsPopulated() {
+							log.V(4).Infof("handleChildDeleteForOcReplaceAndDelete: key %v|%v not found in DB, skipping delete", tblNm, tableKey)
+							continue
+						}
+
+						err = d.DeleteEntry(cmnAppTs, db.Key{Comp: []string{tableKey}})
+						if err != nil {
+							if cvl.CVLRetCode(err.(tlerr.TranslibCVLFailure).Code) == cvl.CVL_SEMANTIC_KEY_NOT_EXIST {
+								log.V(4).Infof("Ignore delete that cannot be processed for table %v key %v that does not exist. err %v", tblNm, tableKey, err.(tlerr.TranslibCVLFailure).CVLErrorInfo.ConstraintErrMsg)
+								err = nil
+							} else {
+								log.Warning("DELETE case - d.DeleteEntry() failure")
+								return err
+							}
+						}
 					}
 				}
 			}
+
 		}
 	}
 	return err

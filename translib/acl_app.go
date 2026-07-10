@@ -1808,3 +1808,7 @@ func (app *AclApp) processPreparePhase(d *db.DB, ckey string) error {
 func (app *AclApp) rollback(d *db.DB) error {
 	return nil
 }
+
+func (app *AclApp) processCVLValidate(d *db.DB) error {
+	return nil
+}

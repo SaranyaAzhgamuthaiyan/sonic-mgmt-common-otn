@@ -538,3 +538,7 @@ func (app *yanglibApp) processPreparePhase(d *db.DB, ckey string) error {
 func (app *yanglibApp) rollback(d *db.DB) error {
 	return nil
 }
+
+func (app *yanglibApp) processCVLValidate(d *db.DB) error {
+	return nil
+}

@@ -49,6 +49,7 @@ import (
 
 // Write lock for all write operations to be synchronized
 var writeMutex = &sync.Mutex{}
+var ENABLE_TRANSLIB_ROLLBACK = "false"
 
 type ErrSource int
 
@@ -173,6 +174,7 @@ func ResponseError(optype string, payload []byte, errorType ErrSource) interface
 }
 
 func commitTransactions(redisMdbInstances map[string]*db.DB, nsMaps []NamespacePayload) error {
+
 	for ns, redisDbInstance := range redisMdbInstances {
 
 		if err := redisDbInstance.CommitTx(); err != nil {
@@ -251,6 +253,13 @@ func processPostPhase() error {
 	return nil
 }
 
+type nsWriteContext struct {
+	nameSpace    string
+	nsPayload    NamespacePayload
+	payloadBytes []byte
+	d            *db.DB
+}
+
 // Create - Creates entries in the redis DB pertaining to the path and payload
 func Create(req SetRequest) (SetResponse, error) {
 	var keys []db.WatchKeys
@@ -301,28 +310,32 @@ func Create(req SetRequest) (SetResponse, error) {
 	writeMutex.Lock()
 	defer writeMutex.Unlock()
 
+	log.Infof("Create: starting PHASE 1 - CVL validation for all namespaces, total namespaces=%d", len(namespacePayloads))
+
+	var writeContexts []nsWriteContext
+
 	for _, nsPayload := range namespacePayloads {
 		nameSpace := nsPayload.Namespace
 		payloads := nsPayload.Payloads
 		if len(payloads) == 0 {
 			log.Infof("Payloads for namespace '%s' are empty, using top-level payload", nameSpace)
-
 			var topLevelPayload map[string]interface{}
 			err := json.Unmarshal(payload, &topLevelPayload)
 			if err != nil {
 				resp.ErrSrc = AppErr
-				log.Errorf("Failed to unmarshal top-level payload: %v", err)
+				abortErr := abortTransactions(redisMdbInstances)
+				if abortErr != nil {
+					return resp, abortErr
+				}
 				return resp, err
 			}
-
 			payloads = append(payloads, topLevelPayload)
 		}
-
+		log.Infof("Create: PHASE1 - CVL Validation for namespace=%s", nameSpace)
 		log.Infof("Namespace: %s", nameSpace)
 
-		for _, payload := range payloads {
-
-			payloadBytes, err := json.Marshal(payload)
+		for _, pl := range payloads {
+			payloadBytes, err := json.Marshal(pl)
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -343,7 +356,6 @@ func Create(req SetRequest) (SetResponse, error) {
 			}
 
 			d, err = initializeMDBInstance(nameSpace, redisMdbInstances)
-
 			if err != nil {
 				resp.ErrSrc = ProtoErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -355,7 +367,6 @@ func Create(req SetRequest) (SetResponse, error) {
 			defer d.DeleteDB()
 
 			keys, err = (*app).translateCreate(d)
-
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -366,7 +377,6 @@ func Create(req SetRequest) (SetResponse, error) {
 			}
 
 			err = d.AppendWatchTx(keys, appInfo.tablesToWatch)
-
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -376,9 +386,10 @@ func Create(req SetRequest) (SetResponse, error) {
 				return resp, err
 			}
 
-			err = (*app).processPreparePhase(d, nsPayload.Key)
-
+			// CVL only
+			err = (*app).processCVLValidate(d)
 			if err != nil {
+				log.Errorf("Create: PHASE 1 - CVL failed for namespace=%s, aborting all , error=%v", nameSpace, err)
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
 				if abortErr != nil {
@@ -386,30 +397,70 @@ func Create(req SetRequest) (SetResponse, error) {
 				}
 				return resp, err
 			}
+			log.Infof("Create: PHASE 1- CVL passed for namespace=%s, queuing for Phase2", nameSpace)
 
-			resp, err = (*app).processCreate(d)
-
-			if err != nil {
-				d.AbortTx()
-				resp.ErrSrc = AppErr
-				abortErr := abortTransactions(redisMdbInstances)
-				if abortErr != nil {
-					return resp, abortErr
-				}
-				return resp, err
-			}
-
-			// Check if the entry with the same nameSpace already exists in the map
-			if _, exists := redisMdbInstances[nameSpace]; !exists {
-				redisMdbInstances[nameSpace] = d
-			}
-
+			writeContexts = append(writeContexts, nsWriteContext{
+				nameSpace: nameSpace, nsPayload: nsPayload,
+				payloadBytes: payloadBytes, d: d,
+			})
 		}
 	}
+	log.Infof("Create: PHASE 1 complete -CVL Passed for all namespaces, total=%d, proceeding to PHASE2", len(writeContexts))
+	log.Infof("Create: Starting PHASE 2 - actual write for all namespaces")
+	for _, ctx := range writeContexts {
+		log.Infof("Create: PHASE2 - writing namespace=%s", ctx.nameSpace)
+		err = appInitialize(app, appInfo, path, &ctx.payloadBytes, nil, CREATE)
+		if err != nil {
+			resp.ErrSrc = AppErr
+			abortErr := abortTransactions(redisMdbInstances)
+			if abortErr != nil {
+				return resp, abortErr
+			}
+			return resp, err
+		}
 
+		// Re-run translate to repopulate cmnAppTableMap for processCreate
+		_, err = (*app).translateCreate(ctx.d)
+		if err != nil {
+			resp.ErrSrc = AppErr
+			abortErr := abortTransactions(redisMdbInstances)
+			if abortErr != nil {
+				return resp, abortErr
+			}
+			return resp, err
+		}
+
+		if ENABLE_TRANSLIB_ROLLBACK == "true" {
+
+			err = (*app).processPreparePhase(ctx.d, ctx.nsPayload.Key)
+			if err != nil {
+				resp.ErrSrc = AppErr
+				abortErr := abortTransactions(redisMdbInstances)
+				if abortErr != nil {
+					return resp, abortErr
+				}
+				return resp, err
+			}
+		}
+		resp, err = (*app).processCreate(ctx.d)
+		if err != nil {
+			ctx.d.AbortTx()
+			resp.ErrSrc = AppErr
+			abortErr := abortTransactions(redisMdbInstances)
+			if abortErr != nil {
+				return resp, abortErr
+			}
+			return resp, err
+		}
+
+		if _, exists := redisMdbInstances[ctx.nameSpace]; !exists {
+			redisMdbInstances[ctx.nameSpace] = ctx.d
+		}
+	}
+	log.Infof("Create: PHASE 2 - all namespaces written successfully, proceeding to commit")
 	cerr := commitTransactions(redisMdbInstances, namespacePayloads)
 
-	if cerr != nil {
+	if cerr != nil && ENABLE_TRANSLIB_ROLLBACK == "true" {
 		for ns, redisDbInstance := range redisMdbInstances {
 			for _, payload := range namespacePayloads {
 				if payload.Namespace == ns && payload.Commited {
@@ -423,11 +474,12 @@ func Create(req SetRequest) (SetResponse, error) {
 			}
 		}
 	}
-	err = processPostPhase()
-	if err != nil {
-		log.Infof("Cleanup of backup entries operation failed!")
+	if ENABLE_TRANSLIB_ROLLBACK == "true" {
+		err = processPostPhase()
+		if err != nil {
+			log.Infof("Cleanup of backup entries operation failed!")
+		}
 	}
-
 	return resp, cerr
 
 }
@@ -438,9 +490,7 @@ func Update(req SetRequest) (SetResponse, error) {
 	var resp SetResponse
 	var d *db.DB
 
-	// Define a map to hold multiple Redis DB instances with mdbName as key
 	var redisMdbInstances map[string]*db.DB
-
 	if redisMdbInstances == nil {
 		redisMdbInstances = make(map[string]*db.DB)
 	}
@@ -458,20 +508,18 @@ func Update(req SetRequest) (SetResponse, error) {
 	log.Info("Update request received with payload =", string(payload))
 
 	app, appInfo, err := getAppModule(path, req.ClientVersion)
-
 	if err != nil {
 		resp.ErrSrc = ProtoErr
 		return resp, err
 	}
 
 	err = appInitialize(app, appInfo, path, &payload, nil, UPDATE)
-
 	if err != nil {
 		resp.ErrSrc = AppErr
 		return resp, err
 	}
-	namespacePayloads, err := (*app).getNamespace(path)
 
+	namespacePayloads, err := (*app).getNamespace(path)
 	if err != nil {
 		log.Infof("Error from getNamespace %v", err)
 		resp.ErrSrc = AppErr
@@ -481,28 +529,33 @@ func Update(req SetRequest) (SetResponse, error) {
 	writeMutex.Lock()
 	defer writeMutex.Unlock()
 
+	var writeContexts []nsWriteContext
+
+	log.Infof("Update: Starting PHASE 1 - CVL validation for all namespaces, total=%d", len(namespacePayloads))
+
 	for _, nsPayload := range namespacePayloads {
 		nameSpace := nsPayload.Namespace
 		payloads := nsPayload.Payloads
 		if len(payloads) == 0 {
 			log.Infof("Payloads for namespace '%s' are empty, using top-level payload", nameSpace)
-
 			var topLevelPayload map[string]interface{}
 			err := json.Unmarshal(payload, &topLevelPayload)
 			if err != nil {
 				resp.ErrSrc = AppErr
 				log.Errorf("Failed to unmarshal top-level payload: %v", err)
+				abortErr := abortTransactions(redisMdbInstances)
+				if abortErr != nil {
+					return resp, abortErr
+				}
 				return resp, err
 			}
-
 			payloads = append(payloads, topLevelPayload)
 		}
 
-		log.Infof("Namespace: %s", nameSpace)
+		log.Infof("Update: PHASE 1 - CVL validation for namespace=%s", nameSpace)
 
-		for _, payload := range payloads {
-
-			payloadBytes, err := json.Marshal(payload)
+		for _, pl := range payloads {
+			payloadBytes, err := json.Marshal(pl)
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -513,7 +566,6 @@ func Update(req SetRequest) (SetResponse, error) {
 			}
 
 			err = appInitialize(app, appInfo, path, &payloadBytes, nil, UPDATE)
-
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -524,7 +576,6 @@ func Update(req SetRequest) (SetResponse, error) {
 			}
 
 			d, err = initializeMDBInstance(nameSpace, redisMdbInstances)
-
 			if err != nil {
 				resp.ErrSrc = ProtoErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -536,7 +587,6 @@ func Update(req SetRequest) (SetResponse, error) {
 			defer d.DeleteDB()
 
 			keys, err = (*app).translateUpdate(d)
-
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -547,7 +597,6 @@ func Update(req SetRequest) (SetResponse, error) {
 			}
 
 			err = d.AppendWatchTx(keys, appInfo.tablesToWatch)
-
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -557,9 +606,9 @@ func Update(req SetRequest) (SetResponse, error) {
 				return resp, err
 			}
 
-			err = (*app).processPreparePhase(d, nsPayload.Key)
-
+			err = (*app).processCVLValidate(d)
 			if err != nil {
+				log.Errorf("Update: PHASE 1 - CVL FAILED for namespace=%s, aborting all, error=%v", nameSpace, err)
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
 				if abortErr != nil {
@@ -567,34 +616,82 @@ func Update(req SetRequest) (SetResponse, error) {
 				}
 				return resp, err
 			}
+			log.Infof("Update: PHASE 1 - CVL passed for namespace=%s, queuing for Phase 2", nameSpace)
 
-			resp, err = (*app).processUpdate(d)
-
-			if err != nil {
-				d.AbortTx()
-				resp.ErrSrc = AppErr
-				abortErr := abortTransactions(redisMdbInstances)
-				if abortErr != nil {
-					return resp, abortErr
-				}
-				return resp, err
-			}
-
-			// Check if the entry with the same nameSpace already exists in the map
-			if _, exists := redisMdbInstances[nameSpace]; !exists {
-				redisMdbInstances[nameSpace] = d
-			}
-
+			writeContexts = append(writeContexts, nsWriteContext{
+				nameSpace:    nameSpace,
+				nsPayload:    nsPayload,
+				payloadBytes: payloadBytes,
+				d:            d,
+			})
 		}
 	}
 
-	cerr := commitTransactions(redisMdbInstances, namespacePayloads)
+	log.Infof("Update: PHASE 1 complete - CVL passed for all namespaces, total=%d, proceeding to PHASE 2", len(writeContexts))
 
-	if cerr != nil {
+	for _, ctx := range writeContexts {
+		ctx.d.SetSkipCVL(true)
+	}
+
+	log.Infof("Update: Starting PHASE 2 - actual Redis writes")
+
+	for _, ctx := range writeContexts {
+		log.Infof("Update: PHASE 2 - writing namespace=%s", ctx.nameSpace)
+
+		err = appInitialize(app, appInfo, path, &ctx.payloadBytes, nil, UPDATE)
+		if err != nil {
+			resp.ErrSrc = AppErr
+			abortErr := abortTransactions(redisMdbInstances)
+			if abortErr != nil {
+				return resp, abortErr
+			}
+			return resp, err
+		}
+
+		_, err = (*app).translateUpdate(ctx.d)
+		if err != nil {
+			resp.ErrSrc = AppErr
+			abortErr := abortTransactions(redisMdbInstances)
+			if abortErr != nil {
+				return resp, abortErr
+			}
+			return resp, err
+		}
+
+		if ENABLE_TRANSLIB_ROLLBACK == "true" {
+			err = (*app).processPreparePhase(ctx.d, ctx.nsPayload.Key)
+			if err != nil {
+				resp.ErrSrc = AppErr
+				abortErr := abortTransactions(redisMdbInstances)
+				if abortErr != nil {
+					return resp, abortErr
+				}
+				return resp, err
+			}
+		}
+		resp, err = (*app).processUpdate(ctx.d)
+		if err != nil {
+			ctx.d.AbortTx()
+			resp.ErrSrc = AppErr
+			abortErr := abortTransactions(redisMdbInstances)
+			if abortErr != nil {
+				return resp, abortErr
+			}
+			return resp, err
+		}
+
+		if _, exists := redisMdbInstances[ctx.nameSpace]; !exists {
+			redisMdbInstances[ctx.nameSpace] = ctx.d
+		}
+	}
+
+	log.Infof("Update: PHASE 2 complete - all namespaces written successfully, proceeding to commit")
+
+	cerr := commitTransactions(redisMdbInstances, namespacePayloads)
+	if cerr != nil && ENABLE_TRANSLIB_ROLLBACK == "true" {
 		for ns, redisDbInstance := range redisMdbInstances {
 			for _, payload := range namespacePayloads {
 				if payload.Namespace == ns && payload.Commited {
-					// Pass the payload.Key for rollback
 					log.Infof("Rollback key:%v,Namespace: %s", payload.Namespace, payload.Key)
 					err = (*app).rollback(redisDbInstance)
 					if err != nil {
@@ -604,13 +701,13 @@ func Update(req SetRequest) (SetResponse, error) {
 			}
 		}
 	}
-	err = processPostPhase()
-	if err != nil {
-		log.Infof("Cleanup of backup entries operation failed!")
+	if ENABLE_TRANSLIB_ROLLBACK == "true" {
+		err = processPostPhase()
+		if err != nil {
+			log.Infof("Cleanup of backup entries operation failed!")
+		}
 	}
-
 	return resp, cerr
-
 }
 
 // Replace - Replaces entries in the redis DB pertaining to the path and payload
@@ -620,9 +717,7 @@ func Replace(req SetRequest) (SetResponse, error) {
 	var resp SetResponse
 	var d *db.DB
 
-	// Define a map to hold multiple Redis DB instances with mdbName as key
 	var redisMdbInstances map[string]*db.DB
-
 	if redisMdbInstances == nil {
 		redisMdbInstances = make(map[string]*db.DB)
 	}
@@ -637,7 +732,6 @@ func Replace(req SetRequest) (SetResponse, error) {
 	}
 
 	app, appInfo, err := getAppModule(path, req.ClientVersion)
-
 	if err != nil {
 		resp.ErrSrc = ProtoErr
 		return resp, err
@@ -647,14 +741,12 @@ func Replace(req SetRequest) (SetResponse, error) {
 	log.Info("Replace request received with payload =", string(payload))
 
 	err = appInitialize(app, appInfo, path, &payload, nil, REPLACE)
-
 	if err != nil {
 		resp.ErrSrc = AppErr
 		return resp, err
 	}
 
 	namespacePayloads, err := (*app).getNamespace(path)
-
 	if err != nil {
 		log.Infof("Error from getNamespace %v", err)
 		resp.ErrSrc = AppErr
@@ -664,28 +756,33 @@ func Replace(req SetRequest) (SetResponse, error) {
 	writeMutex.Lock()
 	defer writeMutex.Unlock()
 
+	var writeContexts []nsWriteContext
+
+	log.Infof("Replace: Starting PHASE 1 - CVL validation for all namespaces, total=%d", len(namespacePayloads))
+
 	for _, nsPayload := range namespacePayloads {
 		nameSpace := nsPayload.Namespace
 		payloads := nsPayload.Payloads
 		if len(payloads) == 0 {
 			log.Infof("Payloads for namespace '%s' are empty, using top-level payload", nameSpace)
-
 			var topLevelPayload map[string]interface{}
 			err := json.Unmarshal(payload, &topLevelPayload)
 			if err != nil {
 				resp.ErrSrc = AppErr
 				log.Errorf("Failed to unmarshal top-level payload: %v", err)
+				abortErr := abortTransactions(redisMdbInstances)
+				if abortErr != nil {
+					return resp, abortErr
+				}
 				return resp, err
 			}
-
 			payloads = append(payloads, topLevelPayload)
 		}
 
-		log.Infof("Namespace: %s", nameSpace)
+		log.Infof("Replace: PHASE 1 - CVL validation for namespace=%s", nameSpace)
 
-		for _, payload := range payloads {
-
-			payloadBytes, err := json.Marshal(payload)
+		for _, pl := range payloads {
+			payloadBytes, err := json.Marshal(pl)
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -696,7 +793,6 @@ func Replace(req SetRequest) (SetResponse, error) {
 			}
 
 			err = appInitialize(app, appInfo, path, &payloadBytes, nil, REPLACE)
-
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -707,7 +803,6 @@ func Replace(req SetRequest) (SetResponse, error) {
 			}
 
 			d, err = initializeMDBInstance(nameSpace, redisMdbInstances)
-
 			if err != nil {
 				resp.ErrSrc = ProtoErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -719,7 +814,6 @@ func Replace(req SetRequest) (SetResponse, error) {
 			defer d.DeleteDB()
 
 			keys, err = (*app).translateReplace(d)
-
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -730,7 +824,6 @@ func Replace(req SetRequest) (SetResponse, error) {
 			}
 
 			err = d.AppendWatchTx(keys, appInfo.tablesToWatch)
-
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -740,9 +833,9 @@ func Replace(req SetRequest) (SetResponse, error) {
 				return resp, err
 			}
 
-			err = (*app).processPreparePhase(d, nsPayload.Key)
-
+			err = (*app).processCVLValidate(d)
 			if err != nil {
+				log.Errorf("Replace: PHASE 1 - CVL FAILED for namespace=%s, aborting all, error=%v", nameSpace, err)
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
 				if abortErr != nil {
@@ -750,34 +843,82 @@ func Replace(req SetRequest) (SetResponse, error) {
 				}
 				return resp, err
 			}
+			log.Infof("Replace: PHASE 1 - CVL passed for namespace=%s, queuing for Phase 2", nameSpace)
 
-			resp, err = (*app).processReplace(d)
-
-			if err != nil {
-				d.AbortTx()
-				resp.ErrSrc = AppErr
-				abortErr := abortTransactions(redisMdbInstances)
-				if abortErr != nil {
-					return resp, abortErr
-				}
-				return resp, err
-			}
-
-			// Check if the entry with the same nameSpace already exists in the map
-			if _, exists := redisMdbInstances[nameSpace]; !exists {
-				redisMdbInstances[nameSpace] = d
-			}
-
+			writeContexts = append(writeContexts, nsWriteContext{
+				nameSpace:    nameSpace,
+				nsPayload:    nsPayload,
+				payloadBytes: payloadBytes,
+				d:            d,
+			})
 		}
 	}
 
-	cerr := commitTransactions(redisMdbInstances, namespacePayloads)
+	log.Infof("Replace: PHASE 1 complete - CVL passed for all namespaces, total=%d, proceeding to PHASE 2", len(writeContexts))
+	for _, ctx := range writeContexts {
+		ctx.d.SetSkipCVL(true)
+	}
 
-	if cerr != nil {
+	log.Infof("Replace: Starting PHASE 2 - actual Redis writes")
+
+	for _, ctx := range writeContexts {
+		log.Infof("Replace: PHASE 2 - writing namespace=%s", ctx.nameSpace)
+
+		err = appInitialize(app, appInfo, path, &ctx.payloadBytes, nil, REPLACE)
+		if err != nil {
+			resp.ErrSrc = AppErr
+			abortErr := abortTransactions(redisMdbInstances)
+			if abortErr != nil {
+				return resp, abortErr
+			}
+			return resp, err
+		}
+
+		_, err = (*app).translateReplace(ctx.d)
+		if err != nil {
+			resp.ErrSrc = AppErr
+			abortErr := abortTransactions(redisMdbInstances)
+			if abortErr != nil {
+				return resp, abortErr
+			}
+			return resp, err
+		}
+
+		if ENABLE_TRANSLIB_ROLLBACK == "true" {
+			err = (*app).processPreparePhase(ctx.d, ctx.nsPayload.Key)
+			if err != nil {
+				resp.ErrSrc = AppErr
+				abortErr := abortTransactions(redisMdbInstances)
+				if abortErr != nil {
+					return resp, abortErr
+				}
+				return resp, err
+			}
+		}
+
+		resp, err = (*app).processReplace(ctx.d)
+		if err != nil {
+			ctx.d.AbortTx()
+			resp.ErrSrc = AppErr
+			abortErr := abortTransactions(redisMdbInstances)
+			if abortErr != nil {
+				return resp, abortErr
+			}
+			return resp, err
+		}
+
+		if _, exists := redisMdbInstances[ctx.nameSpace]; !exists {
+			redisMdbInstances[ctx.nameSpace] = ctx.d
+		}
+	}
+
+	log.Infof("Replace: PHASE 2 complete - all namespaces written successfully, proceeding to commit")
+
+	cerr := commitTransactions(redisMdbInstances, namespacePayloads)
+	if cerr != nil && ENABLE_TRANSLIB_ROLLBACK == "true" {
 		for ns, redisDbInstance := range redisMdbInstances {
 			for _, payload := range namespacePayloads {
 				if payload.Namespace == ns && payload.Commited {
-					// Pass the payload.Key for rollback
 					log.Infof("Rollback key:%v,Namespace: %s", payload.Namespace, payload.Key)
 					err = (*app).rollback(redisDbInstance)
 					if err != nil {
@@ -787,11 +928,12 @@ func Replace(req SetRequest) (SetResponse, error) {
 			}
 		}
 	}
-	err = processPostPhase()
-	if err != nil {
-		log.Infof("Cleanup of backup entries operation failed!")
+	if ENABLE_TRANSLIB_ROLLBACK == "true" {
+		err = processPostPhase()
+		if err != nil {
+			log.Infof("Cleanup of backup entries operation failed!")
+		}
 	}
-
 	return resp, cerr
 }
 
@@ -802,9 +944,7 @@ func Delete(req SetRequest) (SetResponse, error) {
 	var keys []db.WatchKeys
 	var d *db.DB
 
-	// Define a map to hold multiple Redis DB instances with mdbName as key
 	var redisMdbInstances map[string]*db.DB
-
 	if redisMdbInstances == nil {
 		redisMdbInstances = make(map[string]*db.DB)
 	}
@@ -820,23 +960,19 @@ func Delete(req SetRequest) (SetResponse, error) {
 	log.Info("Delete request received with path =", path)
 
 	app, appInfo, err := getAppModule(path, req.ClientVersion)
-
 	if err != nil {
 		resp.ErrSrc = ProtoErr
 		return resp, err
 	}
 
 	opts := appOptions{deleteEmptyEntry: req.DeleteEmptyEntry}
-
 	err = appInitialize(app, appInfo, path, nil, &opts, DELETE)
-
 	if err != nil {
 		resp.ErrSrc = AppErr
 		return resp, err
 	}
 
 	namespacePayloads, err := (*app).getNamespace(path)
-
 	if err != nil {
 		log.Infof("Error from getNamespace %v", err)
 		resp.ErrSrc = AppErr
@@ -844,7 +980,6 @@ func Delete(req SetRequest) (SetResponse, error) {
 	}
 
 	// Fetching the DBNames to iterate if getNamespace returned *
-	// if keys is not present in xpath of GetRequest.
 	if len(namespacePayloads) == 1 && namespacePayloads[0].Namespace == "*" {
 		allNamespaces := db.GetMultiDbNames()
 		key := namespacePayloads[0].Key
@@ -852,34 +987,31 @@ func Delete(req SetRequest) (SetResponse, error) {
 		for _, ns := range allNamespaces {
 			namespacePayloads = append(namespacePayloads, NamespacePayload{
 				Namespace: ns,
-				Payloads:  nil, // no payload needed for delete
-				Key:       key, // preserve original key *
+				Payloads:  nil,
+				Key:       key,
 			})
 		}
-
 	}
 
 	writeMutex.Lock()
 	defer writeMutex.Unlock()
 
+	var writeContexts []nsWriteContext
+
+	log.Infof("Delete: Starting PHASE 1 - CVL validation for all namespaces, total=%d", len(namespacePayloads))
+
 	for _, nsPayload := range namespacePayloads {
-
 		opts := appOptions{deleteEmptyEntry: req.DeleteEmptyEntry}
-
 		err = appInitialize(app, appInfo, path, nil, &opts, DELETE)
-
 		if err != nil {
 			resp.ErrSrc = AppErr
 			return resp, err
 		}
 
 		nameSpace := nsPayload.Namespace
+		log.Infof("Delete: PHASE 1 - CVL validation for namespace=%s", nameSpace)
 
-		log.Infof("Namespace: %s", nameSpace)
-
-		log.Info("Delete operation going to be performed on ", nameSpace)
 		d, err = initializeMDBInstance(nameSpace, redisMdbInstances)
-
 		if err != nil {
 			resp.ErrSrc = ProtoErr
 			abortErr := abortTransactions(redisMdbInstances)
@@ -891,7 +1023,6 @@ func Delete(req SetRequest) (SetResponse, error) {
 		defer d.DeleteDB()
 
 		keys, err = (*app).translateDelete(d)
-
 		if err != nil {
 			resp.ErrSrc = AppErr
 			abortErr := abortTransactions(redisMdbInstances)
@@ -902,7 +1033,6 @@ func Delete(req SetRequest) (SetResponse, error) {
 		}
 
 		err = d.AppendWatchTx(keys, appInfo.tablesToWatch)
-
 		if err != nil {
 			resp.ErrSrc = AppErr
 			abortErr := abortTransactions(redisMdbInstances)
@@ -912,10 +1042,46 @@ func Delete(req SetRequest) (SetResponse, error) {
 			return resp, err
 		}
 
-		log.Infof("Calling processPreparePhase")
-		err = (*app).processPreparePhase(d, nsPayload.Key)
-		log.Infof("Return processPreparePhase")
+		d.Opts.DisableCVLCheck = true
+		err = (*app).processCVLValidate(d)
+		d.Opts.DisableCVLCheck = false
+		if err != nil {
+			log.Errorf("Delete: PHASE 1 - CVL FAILED for namespace=%s, aborting all, error=%v", nameSpace, err)
+			resp.ErrSrc = AppErr
+			abortErr := abortTransactions(redisMdbInstances)
+			if abortErr != nil {
+				return resp, abortErr
+			}
+			return resp, err
+		}
+		log.Infof("Delete: PHASE 1 - CVL passed for namespace=%s, queuing for Phase 2", nameSpace)
 
+		writeContexts = append(writeContexts, nsWriteContext{
+			nameSpace: nameSpace,
+			nsPayload: nsPayload,
+			d:         d,
+		})
+	}
+
+	log.Infof("Delete: PHASE 1 complete - CVL passed for all namespaces, total=%d, proceeding to PHASE 2", len(writeContexts))
+
+	for _, ctx := range writeContexts {
+		ctx.d.SetSkipCVL(true)
+	}
+
+	log.Infof("Delete: Starting PHASE 2 - actual Redis writes")
+
+	for _, ctx := range writeContexts {
+		log.Infof("Delete: PHASE 2 - writing namespace=%s", ctx.nameSpace)
+
+		opts := appOptions{deleteEmptyEntry: req.DeleteEmptyEntry}
+		err = appInitialize(app, appInfo, path, nil, &opts, DELETE)
+		if err != nil {
+			resp.ErrSrc = AppErr
+			return resp, err
+		}
+
+		_, err = (*app).translateDelete(ctx.d)
 		if err != nil {
 			resp.ErrSrc = AppErr
 			abortErr := abortTransactions(redisMdbInstances)
@@ -925,10 +1091,22 @@ func Delete(req SetRequest) (SetResponse, error) {
 			return resp, err
 		}
 
-		resp, err = (*app).processDelete(d)
+		if ENABLE_TRANSLIB_ROLLBACK == "true" {
+			log.Infof("Delete: PHASE 2 - Calling processPreparePhase for namespace=%s", ctx.nameSpace)
+			err = (*app).processPreparePhase(ctx.d, ctx.nsPayload.Key)
+			if err != nil {
+				resp.ErrSrc = AppErr
+				abortErr := abortTransactions(redisMdbInstances)
+				if abortErr != nil {
+					return resp, abortErr
+				}
+				return resp, err
+			}
 
+		}
+		resp, err = (*app).processDelete(ctx.d)
 		if err != nil {
-			d.AbortTx()
+			ctx.d.AbortTx()
 			resp.ErrSrc = AppErr
 			abortErr := abortTransactions(redisMdbInstances)
 			if abortErr != nil {
@@ -937,18 +1115,18 @@ func Delete(req SetRequest) (SetResponse, error) {
 			return resp, err
 		}
 
-		// Check if the entry with the same nameSpace already exists in the map
-		if _, exists := redisMdbInstances[nameSpace]; !exists {
-			redisMdbInstances[nameSpace] = d
+		if _, exists := redisMdbInstances[ctx.nameSpace]; !exists {
+			redisMdbInstances[ctx.nameSpace] = ctx.d
 		}
 	}
 
+	log.Infof("Delete: PHASE 2 complete - all namespaces written successfully, proceeding to commit")
+
 	cerr := commitTransactions(redisMdbInstances, namespacePayloads)
-	if cerr != nil {
+	if cerr != nil && ENABLE_TRANSLIB_ROLLBACK == "true" {
 		for ns, redisDbInstance := range redisMdbInstances {
 			for _, payload := range namespacePayloads {
 				if payload.Namespace == ns && payload.Commited {
-					// Pass the payload.Key for rollback
 					log.Infof("Rollback key:%v,Namespace: %s", payload.Namespace, payload.Key)
 					err = (*app).rollback(redisDbInstance)
 					if err != nil {
@@ -958,14 +1136,13 @@ func Delete(req SetRequest) (SetResponse, error) {
 			}
 		}
 	}
-
-	err = processPostPhase()
-	if err != nil {
-		log.Infof("Cleanup of backup entries operation failed!")
+	if ENABLE_TRANSLIB_ROLLBACK == "true" {
+		err = processPostPhase()
+		if err != nil {
+			log.Infof("Cleanup of backup entries operation failed!")
+		}
 	}
-
 	return resp, cerr
-
 }
 
 // Get - Gets data from the redis DB and converts it to northbound format
@@ -1183,7 +1360,6 @@ func Action(req ActionRequest) ([]ActionResponse, error) {
 // Bulk - BULK Request API for northbounds
 // Processes the request in received order
 // Transaction based
-
 func Bulk(req BulkRequest) (BulkResponse, error) {
 	type bulkRequestContext struct {
 		app               *appInterface
@@ -1191,6 +1367,11 @@ func Bulk(req BulkRequest) (BulkResponse, error) {
 		namespacePayloads []NamespacePayload
 		keyStr            string
 		operation         int
+		reqIndex          int
+		nameSpace         string
+		nsPayload         NamespacePayload
+		payloadBytes      []byte
+		d                 *db.DB
 	}
 
 	var err error
@@ -1201,7 +1382,7 @@ func Bulk(req BulkRequest) (BulkResponse, error) {
 
 	resp := BulkResponse{}
 	redisMdbInstances := make(map[string]*db.DB)
-	contexts := make([]bulkRequestContext, len(req.Request))
+	var writeContexts []bulkRequestContext
 
 	if !isAuthorizedForBulk(req) {
 		return resp, tlerr.AuthorizationError{
@@ -1213,6 +1394,8 @@ func Bulk(req BulkRequest) (BulkResponse, error) {
 	defer writeMutex.Unlock()
 
 	resp.Response = make([]BulkResponseEntry, len(req.Request))
+
+	log.Infof("Bulk: Starting PHASE 1 - CVL validation for all namespaces, total=%d", len(req.Request))
 
 	for i := range req.Request {
 		var keyStr string // Declare early to avoid goto skipping declaration
@@ -1277,6 +1460,41 @@ func Bulk(req BulkRequest) (BulkResponse, error) {
 
 			if operation == DELETE {
 				keys, err = (*app).translateDelete(d)
+
+				if err != nil {
+					errSrc = AppErr
+					goto BulkError
+				}
+
+				err = d.AppendWatchTx(keys, appInfo.tablesToWatch)
+				if err != nil {
+					errSrc = AppErr
+					goto BulkError
+				}
+				log.Infof("Bulk: PHASE 1 - AppendWatchTx done for namespace=%s", nameSpace)
+
+				d.Opts.DisableCVLCheck = true
+				err = (*app).processCVLValidate(d)
+				d.Opts.DisableCVLCheck = false
+				if err != nil {
+					log.Errorf("Bulk: PHASE 1 - CVL FAILED for namespace=%s, aborting all, error=%v", nameSpace, err)
+					errSrc = AppErr
+					goto BulkError
+				}
+				log.Infof("Bulk: PHASE 1 - CVL passed for namespace=%s, queuing for Phase 2", nameSpace)
+
+				writeContexts = append(writeContexts, bulkRequestContext{
+					app:               app,
+					appInfo:           appInfo,
+					namespacePayloads: namespacePayloads,
+					keyStr:            keyStr,
+					operation:         operation,
+					reqIndex:          i,
+					nameSpace:         nameSpace,
+					nsPayload:         nsPayload,
+					payloadBytes:      payloadBytes,
+					d:                 d,
+				})
 			} else {
 				if len(payloads) == 0 {
 					log.Infof("Payloads for namespace '%s' are empty, using top-level payload", nameSpace)
@@ -1303,96 +1521,61 @@ func Bulk(req BulkRequest) (BulkResponse, error) {
 						errSrc = AppErr
 						goto BulkError
 					}
-				}
 
-				switch operation {
-				case CREATE:
-					keys, err = (*app).translateCreate(d)
-				case UPDATE:
-					keys, err = (*app).translateUpdate(d)
-					if err != nil && isBulkNotFoundError(err) {
-						log.V(2).Infof("Since UPDATE Failed, Changing operation type to REPLACE")
-						operation = REPLACE
-						err = appInitialize(app, appInfo, path, &payloadBytes, nil, operation)
-						if err != nil {
-							errSrc = AppErr
-							goto BulkError
+					switch operation {
+					case CREATE:
+						keys, err = (*app).translateCreate(d)
+					case UPDATE:
+						keys, err = (*app).translateUpdate(d)
+						if err != nil && isBulkNotFoundError(err) {
+							log.V(2).Infof("Since UPDATE Failed, Changing operation type to REPLACE")
+							operation = REPLACE
+							err = appInitialize(app, appInfo, path, &payloadBytes, nil, operation)
+							if err != nil {
+								errSrc = AppErr
+								goto BulkError
+							}
+							keys, err = (*app).translateReplace(d)
 						}
+					case REPLACE:
 						keys, err = (*app).translateReplace(d)
+					default:
+						err = tlerr.NotSupported("Unknown operation '%v'", operation)
 					}
-				case REPLACE:
-					keys, err = (*app).translateReplace(d)
-				default:
-					err = tlerr.NotSupported("Unknown operation '%v'", operation)
-				}
-			}
 
-			if err != nil {
-				errSrc = AppErr
-				goto BulkError
-			}
-
-			err = d.AppendWatchTx(keys, appInfo.tablesToWatch)
-			if err != nil {
-				errSrc = AppErr
-				goto BulkError
-			}
-
-			contexts[i] = bulkRequestContext{
-				app:               app,
-				appInfo:           appInfo,
-				namespacePayloads: namespacePayloads,
-				keyStr:            keyStr,
-				operation:         operation,
-			}
-
-			err = (*app).processPreparePhase(d, keyStr)
-			if err != nil {
-				errSrc = AppErr
-				goto BulkError
-			}
-
-			switch operation {
-			case DELETE:
-				appResp, err = (*app).processDelete(d)
-			case CREATE:
-				appResp, err = (*app).processCreate(d)
-			case UPDATE:
-				appResp, err = (*app).processUpdate(d)
-				if err != nil && isBulkNotFoundError(err) {
-					log.V(2).Infof("Since UPDATE Failed again, fallback to REPLACE")
-					operation = REPLACE
-					err = appInitialize(app, appInfo, path, &payloadBytes, nil, operation)
 					if err != nil {
 						errSrc = AppErr
 						goto BulkError
 					}
-					keys, err = (*app).translateReplace(d)
-					if err != nil {
-						errSrc = AppErr
-						goto BulkError
-					}
+
 					err = d.AppendWatchTx(keys, appInfo.tablesToWatch)
 					if err != nil {
 						errSrc = AppErr
 						goto BulkError
 					}
-					appResp, err = (*app).processReplace(d)
+
+					err = (*app).processCVLValidate(d)
+					if err != nil {
+						log.Errorf("Bulk: PHASE 1 - CVL FAILED for namespace=%s, aborting all, error=%v", nameSpace, err)
+						errSrc = AppErr
+						goto BulkError
+					}
+					log.Infof("Bulk: PHASE 1 - CVL passed for namespace=%s, queuing for Phase 2", nameSpace)
+
+					writeContexts = append(writeContexts, bulkRequestContext{
+						app:               app,
+						appInfo:           appInfo,
+						namespacePayloads: namespacePayloads,
+						keyStr:            keyStr,
+						operation:         operation,
+						reqIndex:          i,
+						nameSpace:         nameSpace,
+						nsPayload:         nsPayload,
+						payloadBytes:      payloadBytes,
+						d:                 d,
+					})
 				}
-			case REPLACE:
-				appResp, err = (*app).processReplace(d)
 			}
-
-			if err != nil {
-				errSrc = AppErr
-				goto BulkError
-			}
-
-			if _, exists := redisMdbInstances[nameSpace]; !exists {
-				redisMdbInstances[nameSpace] = d
-			}
-
-			resp.Response[i].Entry = appResp
 		}
 
 		continue
@@ -1414,15 +1597,100 @@ func Bulk(req BulkRequest) (BulkResponse, error) {
 		return resp, err
 	}
 
+	log.Infof("Bulk: PHASE 1 complete - CVL passed for all namespaces, total=%d, proceeding to PHASE 2", len(writeContexts))
+
+	log.Infof("Bulk: Starting PHASE 2 - actual Redis writes")
+
+	for _, ctx := range writeContexts {
+		log.Infof("Bulk: PHASE 2 - writing namespace=%s", ctx.nameSpace)
+
+		path := req.Request[ctx.reqIndex].Entry.Path
+
+		// Re-init and re-translate for this specific context's payload —
+		// app is shared across all payload items within the same request
+		// index, so its internal state must be repopulated per-context
+		// before writing, otherwise only the last Phase-1 iteration's
+		// state would get written repeatedly.
+		if ctx.operation != DELETE {
+			err = appInitialize(ctx.app, ctx.appInfo, path, &ctx.payloadBytes, nil, ctx.operation)
+			if err != nil {
+				errSrc = AppErr
+				goto BulkError2
+			}
+
+			switch ctx.operation {
+			case CREATE:
+				_, err = (*ctx.app).translateCreate(ctx.d)
+			case UPDATE:
+				_, err = (*ctx.app).translateUpdate(ctx.d)
+			case REPLACE:
+				_, err = (*ctx.app).translateReplace(ctx.d)
+			}
+			if err != nil {
+				errSrc = AppErr
+				goto BulkError2
+			}
+		}
+
+		if ENABLE_TRANSLIB_ROLLBACK == "true" {
+			err = (*ctx.app).processPreparePhase(ctx.d, ctx.keyStr)
+			if err != nil {
+				errSrc = AppErr
+				goto BulkError2
+			}
+		}
+
+		switch ctx.operation {
+		case DELETE:
+			appResp, err = (*ctx.app).processDelete(ctx.d)
+		case CREATE:
+			appResp, err = (*ctx.app).processCreate(ctx.d)
+		case UPDATE:
+			appResp, err = (*ctx.app).processUpdate(ctx.d)
+		case REPLACE:
+			appResp, err = (*ctx.app).processReplace(ctx.d)
+		}
+
+		if err != nil {
+			errSrc = AppErr
+			goto BulkError2
+		}
+
+		if _, exists := redisMdbInstances[ctx.nameSpace]; !exists {
+			redisMdbInstances[ctx.nameSpace] = ctx.d
+		}
+
+		resp.Response[ctx.reqIndex].Entry = appResp
+		continue
+
+	BulkError2:
+		log.Infof("BulkError: %+v", err)
+		appResp.Err = err
+		appResp.ErrSrc = errSrc
+		resp.Response[ctx.reqIndex].Entry = appResp
+
+		abortErr := abortTransactions(redisMdbInstances)
+		if abortErr != nil {
+			appResp.Err = abortErr
+			appResp.ErrSrc = errSrc
+			resp.Response[ctx.reqIndex].Entry = appResp
+			return resp, abortErr
+		}
+
+		return resp, err
+	}
+
+	log.Infof("Bulk: PHASE 2 complete - all namespaces written successfully, proceeding to commit")
+
 	// COMMIT PHASE
 	cerr := commitTransactions(redisMdbInstances, namespacePayloads)
 
 	// POST-COMMIT or ROLLBACK
-	for _, ctx := range contexts {
+	for _, ctx := range writeContexts {
 		app := ctx.app
 		namespacePayloads := ctx.namespacePayloads
 
-		if cerr != nil {
+		if cerr != nil && ENABLE_TRANSLIB_ROLLBACK == "true" {
 			for ns, redisDbInstance := range redisMdbInstances {
 				for _, payload := range namespacePayloads {
 					if payload.Namespace == ns && payload.Commited {
@@ -1436,12 +1704,12 @@ func Bulk(req BulkRequest) (BulkResponse, error) {
 			}
 		}
 	}
-
-	err = processPostPhase()
-	if err != nil {
-		log.Infof("Cleanup of backup entries operation failed!")
+	if ENABLE_TRANSLIB_ROLLBACK == "true" {
+		err = processPostPhase()
+		if err != nil {
+			log.Infof("Cleanup of backup entries operation failed!")
+		}
 	}
-
 	return resp, cerr
 }
 

@@ -457,3 +457,7 @@ func (app *lldpApp) processPreparePhase(d *db.DB, ckey string) error {
 func (app *lldpApp) rollback(d *db.DB) error {
 	return nil
 }
+
+func (app *lldpApp) processCVLValidate(d *db.DB) error {
+	return nil
+}

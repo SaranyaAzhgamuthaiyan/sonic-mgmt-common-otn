@@ -374,3 +374,7 @@ func (app *SysApp) processPreparePhase(d *db.DB, ckey string) error {
 func (app *SysApp) rollback(d *db.DB) error {
 	return nil
 }
+
+func (app *SysApp) processCVLValidate(d *db.DB) error {
+	return nil
+}

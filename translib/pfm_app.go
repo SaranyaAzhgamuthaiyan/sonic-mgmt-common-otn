@@ -577,3 +577,7 @@ func (app *PlatformApp) processPreparePhase(d *db.DB, ckey string) error {
 func (app *PlatformApp) rollback(d *db.DB) error {
 	return nil
 }
+
+func (app *PlatformApp) processCVLValidate(d *db.DB) error {
+	return nil
+}

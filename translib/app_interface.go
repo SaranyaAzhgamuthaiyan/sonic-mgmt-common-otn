@@ -119,6 +119,7 @@ type appInterface interface {
 	processGet(dbs [db.MaxDB]*db.DB, fmtType TranslibFmtType) (GetResponse, error)
 	processAction(dbs [db.MaxDB]*db.DB) (ActionResponse, error)
 	processSubscribe(req processSubRequest) (processSubResponse, error)
+	processCVLValidate(d *db.DB) error
 }
 
 // App modules will use this function to register with App interface during boot up

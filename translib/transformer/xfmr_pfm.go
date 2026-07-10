@@ -190,7 +190,7 @@ var pfm_post_xfmr PostXfmrFunc = func(inParams XfmrParams) error {
 	if inParams.oper == CREATE {
 		if strings.Contains(inParams.requestUri, "components") {
 			for _, table := range []string{OCH_TBL, TRANSCEIVER_TBL} {
-				if retDbDataMap[table] == nil {
+				if retDbDataMap[table] == nil || len(retDbDataMap[table]) == 0 {
 					continue
 				}
 
@@ -240,8 +240,13 @@ var pfm_post_xfmr PostXfmrFunc = func(inParams XfmrParams) error {
 				retDbDataMap[tableTsName] = make(map[string]db.Value) // clears table
 			}
 		}
+		//DELETE ALL CASE
+		if tableTsName == "" && keyName == "" {
+			log.Infof("pfm_post_xfmr: DELETE ALL detected, wiping OC_COMPONENT and TRANSCEIVER tables")
+			retDbDataMap[OC_COMPONENT_TBL] = make(map[string]db.Value)
+			retDbDataMap[TRANSCEIVER_TBL] = make(map[string]db.Value)
+		}
 	}
-
 	log.Infof("pfm_post_xfmr: Updated dbDataMap: %+v", retDbDataMap)
 	return nil
 }

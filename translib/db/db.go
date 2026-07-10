@@ -391,10 +391,44 @@ type DB struct {
 	onCReg dbOnChangeReg // holds OnChange enabled table names
 
 	// PubSubRpc
-	rPubSub *redis.PubSub
-
+	rPubSub        *redis.PubSub
+	txValidateOnly bool
+	txSkipCVL      bool
 	// Non-Session Config DB Lock acquired
 	configDBLocked bool
+}
+
+func (d *DB) SetValidateOnly(v bool) {
+	glog.Infof("SetValidateOnly: namespace=%s,txValidateOnly=%v", d.Opts.MDBName, v)
+	d.txValidateOnly = v
+	if !v {
+		glog.Infof("SetValidateOnly: clearing txTsEntryMap and txCmds for clean phase 2")
+		d.txCmds = d.txCmds[:0]
+		d.cvlEditConfigData = d.cvlEditConfigData[:0]
+		d.txTsEntryMap = make(map[string]map[string]Value)
+		d.txTsEntryHGetAll = make(map[string]map[string]Value)
+
+		//Reset CVL Session to flush stale libyang tree
+		if d.cv != nil {
+			if ret := cvl.ValidationSessClose(d.cv); ret != cvl.CVL_SUCCESS {
+				glog.Errorf("SetValidateOnly: error closing CVL session: %v", cvl.GetErrorString(ret))
+			}
+			d.cv = nil
+		}
+		var e error
+		if d.cv, e = d.NewValidationSession(); e != nil {
+			glog.Errorf("SetValidateOnly: error reopening CVL Session: %v", e)
+		}
+	}
+
+}
+
+func (d *DB) SetSkipCVL(v bool) {
+	glog.Infof("SetSkipCVL: namespace=%s, txSkipCVL=%v", d.Opts.MDBName, v)
+	d.txSkipCVL = v
+}
+func (d *DB) GetTxValidateOnly() bool {
+	return d.txValidateOnly
 }
 
 func (d DB) String() string {
@@ -1077,6 +1111,10 @@ func (d *DB) doCVL(ts *TableSpec, cvlOps []cmn.CVLOperation, key Key, vals []Val
 		goto doCVLExit
 	}
 
+	if d.txSkipCVL {
+		glog.Info("doCVL: txSkipCVL=true, skipping CVL for Phase 2")
+		goto doCVLExit
+	}
 	if len(cvlOps) != len(vals) {
 		glog.Error("doCVL: Incorrect arguments len(cvlOps) != len(vals)")
 		e = errors.New("CVL Incorrect args")
@@ -1118,6 +1156,9 @@ func (d *DB) doCVL(ts *TableSpec, cvlOps []cmn.CVLOperation, key Key, vals []Val
 	if glog.V(3) {
 		glog.Info("doCVL: calling ValidateEditConfig: ", d.cvlEditConfigData)
 	}
+
+	glog.Infof("doCVL: CALLING ValidateEditConfig — table=%s key=%v numEditConfigData=%d txValidateOnly=%v",
+		ts.Name, key, len(d.cvlEditConfigData), d.txValidateOnly)
 
 	cei, cvlRetCode = d.cv.ValidateEditConfig(d.cvlEditConfigData)
 
@@ -1303,6 +1344,10 @@ func (d *DB) doWrite(ts *TableSpec, op _txOp, k Key, val interface{}) error {
 	}
 
 	if e != nil {
+		goto doWriteExit
+	}
+	if d.txValidateOnly {
+		glog.Info("doWrite: txValidateOnly=true, skipping Redis write for key: ", key)
 		goto doWriteExit
 	}
 
@@ -1936,7 +1981,8 @@ CommitTxExit:
 	d.cvlEditConfigData = d.cvlEditConfigData[:0]
 	d.txTsEntryMap = make(map[string]map[string]Value)
 	d.txTsEntryHGetAll = make(map[string]map[string]Value)
-
+	d.txValidateOnly = false
+	d.txSkipCVL = false
 	//Close CVL session
 	if d.cv != nil {
 		if ret := cvl.ValidationSessClose(d.cv); ret != cvl.CVL_SUCCESS {
@@ -1998,7 +2044,8 @@ AbortTxExit:
 	d.cvlEditConfigData = d.cvlEditConfigData[:0]
 	d.txTsEntryMap = make(map[string]map[string]Value)
 	d.txTsEntryHGetAll = make(map[string]map[string]Value)
-
+	d.txValidateOnly = false
+	d.txSkipCVL = false
 	//Close CVL session
 	if d.cv != nil {
 		if ret := cvl.ValidationSessClose(d.cv); ret != cvl.CVL_SUCCESS {
