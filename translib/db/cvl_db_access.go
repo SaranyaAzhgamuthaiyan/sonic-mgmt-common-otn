@@ -165,7 +165,7 @@ func (c *cvlDBAccess) Lookup(s ctypes.Search) ctypes.JsonResult {
 		return strResult{"", err}
 	}
 
-	v, err := cvl.RunLua(c.Db.client,
+	v, err := cvl.RunLuaOnClient(c.Db.client,
 		"filter_entries",
 		s.Pattern,
 		strings.Join(s.KeyNames, "|"),
@@ -188,7 +188,7 @@ func (c *cvlDBAccess) Count(s ctypes.Search) ctypes.IntResult {
 		return intResult{0, err}
 	}
 	// Advanced key search, with match criteria on has values
-	v, err := cvl.RunLua(c.Db.client,
+	v, err := cvl.RunLuaOnClient(c.Db.client,
 		"count_entries",
 		s.Pattern,
 		strings.Join(s.KeyNames, "|"),

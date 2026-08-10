@@ -1112,8 +1112,7 @@ func TestTransactionCacheWithDBContentSet(t *testing.T) {
 	}
 }
 
-func TestNewDB(t *testing.T) {
-	//NewDB create a connection in multiple DBs function test
+func TestNewDBMultiNamespace(t *testing.T) {
 	dbname := []string{"host", "asic0", "asic1", "asic2", "asic3"}
 	//dbname := GetMultiDbNames()
 	//mdb := make(map[string]*redis.Client)
