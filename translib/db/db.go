@@ -102,13 +102,13 @@ Example:
 package db
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 
-	//	"reflect"
 	"errors"
 	"strings"
 	"time"
@@ -116,8 +116,8 @@ import (
 	"github.com/Azure/sonic-mgmt-common/cvl"
 	cmn "github.com/Azure/sonic-mgmt-common/cvl/common"
 	"github.com/Azure/sonic-mgmt-common/translib/tlerr"
-	"github.com/go-redis/redis/v7"
 	"github.com/golang/glog"
+	"github.com/redis/go-redis/v9"
 )
 
 var (
@@ -246,6 +246,12 @@ type Options struct {
 	IsWriteDisabled    bool   //Is write/set mode disabled ?
 	IsCacheEnabled     bool   //Is cache (Per Connection) allowed?
 
+	// Redis connection pools do not support transactional Redis operations.
+	// If the DB object will be used to perform transactions, the new connection
+	// flag must be set to request a unique Redis client. Transactions include
+	// SCAN and MULTI.
+	ForceNewRedisConnection bool
+
 	// OnChange caching for the DBs passed from Translib's Subscribe Infra
 	// to the Apps. SDB is the SubscribeDB() returned handle on which
 	// notifications of change are received.
@@ -272,10 +278,10 @@ type Options struct {
 
 func (o Options) String() string {
 	return fmt.Sprintf(
-		"{ DBNo: %v, InitIndicator: %v, TableNameSeparator: %v, KeySeparator: %v, IsWriteDisabled: %v, IsCacheEnabled: %v, IsOnChangeEnabled: %v, SDB: %v, DisableCVLCheck: %v, IsSession: %v, ConfigDBLazyLock: %v, TxCmdsLim: %v }",
+		"{ DBNo: %v, InitIndicator: %v, TableNameSeparator: %v, KeySeparator: %v, IsWriteDisabled: %v, IsCacheEnabled: %v, IsOnChangeEnabled: %v, ForceNewRedisConnection: %v, SDB: %v, DisableCVLCheck: %v, IsSession: %v, ConfigDBLazyLock: %v, TxCmdsLim: %v }",
 		o.DBNo, o.InitIndicator, o.TableNameSeparator, o.KeySeparator,
-		o.IsWriteDisabled, o.IsCacheEnabled, o.IsOnChangeEnabled, o.SDB,
-		o.DisableCVLCheck, o.IsSession, o.ConfigDBLazyLock, o.TxCmdsLim)
+		o.IsWriteDisabled, o.IsCacheEnabled, o.IsOnChangeEnabled, o.ForceNewRedisConnection,
+		o.SDB, o.DisableCVLCheck, o.IsSession, o.ConfigDBLazyLock, o.TxCmdsLim)
 }
 
 type _txState int
@@ -513,7 +519,15 @@ func NewDB(opt Options) (*DB, error) {
 	var dur time.Duration
 	now = time.Now()
 
-	d := DB{client: redis.NewClient(adjustRedisOpts(&opt)),
+	var rc *redis.Client
+	if opt.ForceNewRedisConnection {
+		rc = TransactionalRedisClient(opt.DBNo)
+	} else {
+		rc = RedisClient(opt.DBNo)
+	}
+
+	d := DB{
+		client:            rc,
 		Opts:              &opt,
 		txState:           txStateNone,
 		txCmds:            make([]_txCmd, 0, InitialTxPipelineSize),
@@ -566,7 +580,7 @@ func NewDB(opt Options) (*DB, error) {
 	if opt.IsSession && opt.IsOnChangeEnabled {
 		glog.Error("NewDB: Subscription on Config Session not supported : ",
 			d.Name())
-		d.client.Close()
+		CloseRedisClient(d.client)
 		e = tlerr.TranslibDBNotSupported{
 			Description: "Subscription on Config Session not supported"}
 		goto NewDBExit
@@ -575,7 +589,7 @@ func NewDB(opt Options) (*DB, error) {
 	if opt.IsSession && opt.DBNo != ConfigDB {
 		glog.Error("NewDB: Non-Config DB on Config Session not supported : ",
 			d.Name())
-		d.client.Close()
+		CloseRedisClient(d.client)
 		e = tlerr.TranslibDBNotSupported{
 			Description: "Non-Config DB on Config Session not supported"}
 		goto NewDBExit
@@ -601,7 +615,7 @@ func NewDB(opt Options) (*DB, error) {
 	} else {
 		glog.V(3).Info("NewDB: RedisCmd: ", d.Name(), ": ", "GET ",
 			d.Opts.InitIndicator)
-		if init, err := d.client.Get(d.Opts.InitIndicator).Int(); init != 1 {
+		if init, err := d.client.Get(context.Background(), d.Opts.InitIndicator).Int(); init != 1 {
 
 			glog.Error("NewDB: Database not inited: ", d.Name(), ": GET ",
 				d.Opts.InitIndicator)
@@ -609,7 +623,7 @@ func NewDB(opt Options) (*DB, error) {
 				glog.Error("NewDB: Database not inited: ", d.Name(), ": GET ",
 					d.Opts.InitIndicator, " returns err: ", err)
 			}
-			d.client.Close()
+			CloseRedisClient(d.client)
 			e = tlerr.TranslibDBNotInit{}
 			goto NewDBExit
 		}
@@ -623,7 +637,7 @@ func NewDB(opt Options) (*DB, error) {
 
 		if e = ConfigDBTryLock(noSessionToken, opt.MDBName); e != nil {
 			glog.Errorf("NewDB: ConfigDB possibly locked: %s", e)
-			d.client.Close()
+			CloseRedisClient(d.client)
 			goto NewDBExit
 		}
 		d.configDBLocked = true
@@ -680,7 +694,7 @@ func (d *DB) DeleteDB() error {
 		d.unRegisterSessionDB()
 	}
 
-	err := d.client.Close()
+	err := CloseRedisClient(d.client)
 	d.client = nil
 	return err
 }
@@ -690,16 +704,15 @@ func (d *DB) IsOpen() bool {
 }
 
 func (d *DB) key2redis(ts *TableSpec, key Key) string {
-
-	if glog.V(5) {
-		glog.Info("key2redis: Begin: ",
-			ts.Name+
-				d.Opts.TableNameSeparator+
-				strings.Join(key.Comp, d.Opts.KeySeparator))
+	rv := ts.Name
+	fields := strings.Join(key.Comp, d.Opts.KeySeparator)
+	if fields != "" {
+		rv = rv + d.Opts.KeySeparator + fields
 	}
-	return ts.Name +
-		d.Opts.TableNameSeparator +
-		strings.Join(key.Comp, d.Opts.KeySeparator)
+	if glog.V(5) {
+		glog.Info("key2redis: Begin: ", rv)
+	}
+	return rv
 }
 
 func (d *DB) redis2key(ts *TableSpec, redisKey string) Key {
@@ -799,7 +812,7 @@ func (d *DB) getEntry(ts *TableSpec, key Key, forceReadDB bool) (Value, error) {
 		if glog.V(3) {
 			glog.Info("getEntry: RedisCmd: ", d.Name(), ": ", "HGETALL ", entry)
 		}
-		v, e = d.client.HGetAll(entry).Result()
+		v, e = d.client.HGetAll(context.Background(), entry).Result()
 		value = Value{Field: v}
 	}
 
@@ -941,7 +954,7 @@ func (d *DB) GetKeysPattern(ts *TableSpec, pat Key) ([]Key, error) {
 			glog.Info("GetKeysPattern: RedisCmd: ", d.Name(), ": ", "KEYS ", d.key2redis(ts, pat))
 		}
 		var redisKeys []string
-		redisKeys, e = d.client.Keys(d.key2redis(ts, pat)).Result()
+		redisKeys, e = d.client.Keys(context.Background(), d.key2redis(ts, pat)).Result()
 
 		keys = make([]Key, 0, len(redisKeys))
 		// On error, return promptly
@@ -1259,7 +1272,7 @@ func (d *DB) doWrite(ts *TableSpec, op _txOp, k Key, val interface{}) error {
 			for k, v := range val.(Value).Field {
 				vintf[k] = v
 			}
-			e = d.client.HMSet(d.key2redis(ts, key), vintf).Err()
+			e = d.client.HMSet(context.Background(), d.key2redis(ts, key), vintf).Err()
 
 			if e != nil {
 				glog.Error("doWrite: ", d.Name(), ": HMSet: ", key, " : ",
@@ -1272,14 +1285,14 @@ func (d *DB) doWrite(ts *TableSpec, op _txOp, k Key, val interface{}) error {
 				fields = append(fields, k)
 			}
 
-			e = d.client.HDel(d.key2redis(ts, key), fields...).Err()
+			e = d.client.HDel(context.Background(), d.key2redis(ts, key), fields...).Err()
 			if e != nil {
 				glog.Error("doWrite: ", d.Name(), ": HDel: ", key, " : ",
 					fields, " e: ", e)
 			}
 
 		case txOpDel:
-			e = d.client.Del(d.key2redis(ts, key)).Err()
+			e = d.client.Del(context.Background(), d.key2redis(ts, key)).Err()
 			if e != nil {
 				glog.Error("doWrite: ", d.Name(), ": Del: ", key, " : ", e)
 			}
@@ -1312,8 +1325,8 @@ func (d *DB) doWrite(ts *TableSpec, op _txOp, k Key, val interface{}) error {
 		entry := d.key2redis(ts, key)
 		if _, ok := d.txTsEntryMap[ts.Name][entry]; !ok {
 			var v map[string]string
-			glog.Info("doWrite: RedisCmd: ", d.Name(), ": ", "HGETALL ", d.key2redis(ts, key))
-			v, e = d.client.HGetAll(d.key2redis(ts, key)).Result()
+			glog.V(3).Info("doWrite: RedisCmd: ", d.Name(), ": ", "HGETALL ", d.key2redis(ts, key))
+			v, e = d.client.HGetAll(context.Background(), d.key2redis(ts, key)).Result()
 			if len(v) != 0 {
 				d.txTsEntryMap[ts.Name][entry] = Value{Field: v}
 			} else {
@@ -1475,7 +1488,7 @@ func (d *DB) Publish(channel string, message interface{}) error {
 		return ConnectionClosed
 	}
 
-	e := d.client.Publish(channel, message).Err()
+	e := d.client.Publish(context.Background(), channel, message).Err()
 	return e
 }
 
@@ -1489,7 +1502,7 @@ func (d *DB) RunScript(script *redis.Script, keys []string, args ...interface{})
 		return nil
 	}
 
-	return script.Run(d.client, keys, args...)
+	return script.Run(context.Background(), d.client, keys, args...)
 }
 
 // DeleteEntry deletes an entry(row) in the table.
@@ -1794,8 +1807,8 @@ func (d *DB) performWatch(w []WatchKeys, tss []*TableSpec) error {
 			continue
 		}
 
-		glog.Info("performWatch: RedisCmd: ", d.Name(), ": ", "KEYS ", redisKey)
-		redisKeys, e := d.client.Keys(redisKey).Result()
+		glog.V(3).Info("performWatch: RedisCmd: ", d.Name(), ": ", "KEYS ", redisKey)
+		redisKeys, e := d.client.Keys(context.Background(), redisKey).Result()
 		if e != nil {
 			glog.Warning("performWatch: Keys: " + e.Error())
 			if first_e == nil {
@@ -1820,8 +1833,8 @@ func (d *DB) performWatch(w []WatchKeys, tss []*TableSpec) error {
 	}
 
 	// Issue the WATCH
-	glog.Info("performWatch: Do: ", args)
-	_, e = d.client.Do(args...).Result()
+	glog.V(3).Info("performWatch: Do: ", args)
+	_, e = d.client.Do(context.Background(), args...).Result()
 
 	if e != nil {
 		glog.Warning("performWatch: Do: WATCH ", args, " e: ", e.Error())
@@ -1875,7 +1888,7 @@ func (d *DB) commitTx() error {
 
 	// Issue MULTI
 	glog.Info("CommitTx: Do: MULTI")
-	_, e = d.client.Do("MULTI").Result()
+	_, e = d.client.Do(context.Background(), "MULTI").Result()
 
 	if e != nil {
 		glog.Warning("CommitTx: Do: MULTI e: ", e.Error())
@@ -1906,7 +1919,7 @@ func (d *DB) commitTx() error {
 				args = append(args, k, v)
 			}
 
-			_, e = d.client.Do(args...).Result()
+			_, e = d.client.Do(context.Background(), args...).Result()
 
 		case txOpHDel:
 
@@ -1917,14 +1930,14 @@ func (d *DB) commitTx() error {
 				args = append(args, k)
 			}
 
-			_, e = d.client.Do(args...).Result()
+			_, e = d.client.Do(context.Background(), args...).Result()
 
 		case txOpDel:
 
 			args = make([]interface{}, 0, 2)
 			args = append(args, "DEL", redisKey)
 
-			_, e = d.client.Do(args...).Result()
+			_, e = d.client.Do(context.Background(), args...).Result()
 
 		default:
 			glog.Error("CommitTx: Unknown, op: ", d.txCmds[i].op)
@@ -1948,7 +1961,7 @@ func (d *DB) commitTx() error {
 		if glog.V(4) {
 			glog.Info("CommitTx: Do: SET ", d.ts2redisUpdated(&ts), " 1")
 		}
-		_, e = d.client.Do("SET", d.ts2redisUpdated(&ts), "1").Result()
+		_, e = d.client.Do(context.Background(), "SET", d.ts2redisUpdated(&ts), "1").Result()
 		if e != nil {
 			glog.Warning("CommitTx: Do: SET ",
 				d.ts2redisUpdated(&ts), " 1: e: ",
@@ -1967,7 +1980,7 @@ func (d *DB) commitTx() error {
 
 	// Issue EXEC
 	glog.Info("CommitTx: Do: EXEC")
-	_, e = d.client.Do("EXEC").Result()
+	_, e = d.client.Do(context.Background(), "EXEC").Result()
 
 	if e != nil {
 		glog.Warning("CommitTx: Do: EXEC e: ", e.Error())
@@ -2030,8 +2043,8 @@ func (d *DB) abortTx() error {
 	}
 
 	// Issue UNWATCH
-	glog.Info("AbortTx: Do: UNWATCH")
-	_, e = d.client.Do("UNWATCH").Result()
+	glog.V(3).Info("AbortTx: Do: UNWATCH")
+	_, e = d.client.Do(context.Background(), "UNWATCH").Result()
 
 	if e != nil {
 		glog.Warning("AbortTx: Do: UNWATCH e: ", e.Error())
@@ -2066,7 +2079,7 @@ func (d *DB) markConfigDBUpdated() error {
 		glog.Info("markConfigDBUpdated: Do: SET ",
 			d.ts2redisUpdated(&TableSpec{Name: "*"}), " 1")
 	}
-	_, e := d.client.Do("SET", d.ts2redisUpdated(&TableSpec{Name: "*"}),
+	_, e := d.client.Do(context.Background(), "SET", d.ts2redisUpdated(&TableSpec{Name: "*"}),
 		strconv.FormatInt(time.Now().UnixNano(), 10)).Result()
 	if e != nil {
 		glog.Warning("markConfigDBUpdated: Do: SET ",
@@ -2303,29 +2316,28 @@ func setError(e error, idx int, errors *[]error, numKeys int) {
 }
 
 // getMultiEntry retrieves the entries of the given keys using "redis pipeline".
-func (d *DB) getMultiEntry(ts *TableSpec, keys []string) ([]*redis.StringStringMapCmd, error) {
+func (d *DB) getMultiEntry(ts *TableSpec, keys []string) ([]*redis.MapStringStringCmd, error) {
 
 	if glog.V(3) {
 		glog.Info("getMultiEntry: Begin: ts: ", ts)
 	}
 
-	var results = make([]*redis.StringStringMapCmd, len(keys))
+	var results = make([]*redis.MapStringStringCmd, len(keys))
 
 	pipe := d.client.Pipeline()
-	defer pipe.Close()
 
 	if glog.V(3) {
 		glog.Info("getMultiEntry: RedisCmd: ", d.Name(), ": ", "pipe.HGetAll for the ", keys)
 	}
 
 	for i, key := range keys {
-		results[i] = pipe.HGetAll(key)
+		results[i] = pipe.HGetAll(context.Background(), key)
 	}
 
 	if glog.V(3) {
 		glog.Info("getMultiEntry: RedisCmd: ", d.Name(), ": ", "pipe.Exec")
 	}
-	_, err := pipe.Exec()
+	_, err := pipe.Exec(context.Background())
 
 	if glog.V(3) {
 		glog.Info("getMultiEntry: End: ts: ", ts, "results: ", results, "err: ", err)

@@ -33,6 +33,7 @@ func newEnableCVLDB(dBNum DBNum) (*DB, error) {
 		InitIndicator:      "",
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
+
 	})
 	return d, e
 }

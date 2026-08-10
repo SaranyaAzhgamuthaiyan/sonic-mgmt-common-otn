@@ -43,6 +43,7 @@ func TestOnChangeCacheReg(t *testing.T) {
 			DBNo:            ConfigDB,
 			MDBName:         hostDBName,
 			IsWriteDisabled: true,
+
 		})
 		if err := d.RegisterTableForOnChangeCaching(ts); err == nil {
 			t.Fatal("RegisterTableForOnChangeCaching should have failed when IsEnableOnChange=false")
@@ -58,6 +59,7 @@ func TestOnChangeCacheReg(t *testing.T) {
 			MDBName:           hostDBName,
 			IsWriteDisabled:   true,
 			IsOnChangeEnabled: true,
+
 		})
 		if err := d.RegisterTableForOnChangeCaching(ts); err != nil {
 			t.Fatal("RegisterTableForOnChangeCaching failed; ", err)
@@ -75,6 +77,7 @@ func TestOnChangeCacheReg(t *testing.T) {
 			DBNo:              ConfigDB,
 			MDBName:           hostDBName,
 			IsOnChangeEnabled: true,
+
 		})
 		if err == nil {
 			t.Error("NewDB should have failed")
@@ -84,9 +87,10 @@ func TestOnChangeCacheReg(t *testing.T) {
 
 func TestOnChangeCache(t *testing.T) {
 	// OnChange cache enabled db
-	d := newTestDB(t, Options{DBNo: ConfigDB, MDBName: hostDBName, IsWriteDisabled: true, IsOnChangeEnabled: true})
+	d := newTestDB(t, Options{DBNo: ConfigDB, IsWriteDisabled: true, IsOnChangeEnabled: true, ForceNewRedisConnection: false, KeySeparator: "|"})
 	// Writale db to write test keys
-	dw := newTestDB(t, Options{DBNo: ConfigDB, MDBName: hostDBName, DisableCVLCheck: true})
+	dw := newTestDB(t, Options{DBNo: ConfigDB, DisableCVLCheck: true, ForceNewRedisConnection: false, KeySeparator: "|"})
+
 
 	tsA := &TableSpec{Name: "TESTOCC_A"}
 	tsB := &TableSpec{Name: "TESTOCC_B"}

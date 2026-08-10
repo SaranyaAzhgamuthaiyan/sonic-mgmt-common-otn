@@ -641,6 +641,7 @@ func getDBOptions(dbNo db.DBNum, opts ...func(*db.Options)) db.Options {
 	opt = getDBOptionsWithSeparator(dbNo, "", separator, separator)
 	for _, setopt := range opts {
 		setopt(&opt)
+
 	}
 	// If MDBName is not set, use the default nameSpace value
 	if opt.MDBName == "" {

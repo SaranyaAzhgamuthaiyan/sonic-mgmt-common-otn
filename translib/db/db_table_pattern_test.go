@@ -126,6 +126,7 @@ func TestGetTablePattern_txCache(t *testing.T) {
 		DBNo:            ConfigDB,
 		MDBName:         hostDBName,
 		DisableCVLCheck: true,
+
 	})
 	setupTestData(t, d.client, map[string]map[string]interface{}{
 		"TEST_INTERFACE|Ethernet0":              {"vrf": "Vrf1"},
@@ -168,6 +169,9 @@ func TestGetTablePattern_txCache(t *testing.T) {
 	d.CreateEntry(testTable, *NewKey("Ethernet2"), nullValue)
 	d.CreateEntry(testTable, *NewKey("Ethernet2", "102.0.0.1/24"), nullValue)
 	d.CreateEntry(testTable, *NewKey("Ethernet2", "102.0.0.2/32"), nullValue)
+	if err := d.CommitTx(); err != nil {
+		t.Fatal("CommitTx() failed: ", err)
+	}
 
 	// Rerun the tests
 

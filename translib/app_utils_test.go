@@ -153,10 +153,11 @@ func processDeleteRequest(url string) func(*testing.T) {
 
 func getConfigDb() *db.DB {
 	configDb, _ := db.NewDB(db.Options{
-		DBNo:               db.ConfigDB,
-		MDBName:            "host",
-		TableNameSeparator: "|",
-		KeySeparator:       "|",
+		DBNo:                    db.ConfigDB,
+		MDBName:                 "host",
+		TableNameSeparator:      "|",
+		KeySeparator:            "|",
+		ForceNewRedisConnection: false,
 	})
 
 	return configDb

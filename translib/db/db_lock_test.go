@@ -41,6 +41,7 @@ func init() {
 		if stateDB[dbName], err = NewDB(Options{DBNo: StateDB, MDBName: dbName}); err != nil {
 			fmt.Errorf("setupKey: NewDB(StateDB) fails: %v", err)
 		}
+
 	}
 }
 
@@ -350,6 +351,7 @@ func TestLockConfigDBDeleteEntryFields(t *testing.T) {
 		KeySeparator:       "|",
 		ConfigDBLazyLock:   true,
 		DisableCVLCheck:    true,
+
 	})
 
 	if d == nil {

@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/redis/go-redis/v9"
 )
 
 func TestSetGoRedisOpts(t *testing.T) {
@@ -130,6 +130,7 @@ func compareRedisOptsDBRead2Struct(t *testing.T, optsS string, opts *redis.Optio
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 
 	if d == nil {

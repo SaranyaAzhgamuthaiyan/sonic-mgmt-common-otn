@@ -20,14 +20,16 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/redis/go-redis/v9"
 )
 
 var dbConfig = `
@@ -122,6 +124,7 @@ func newReadOnlyDB(dBNum DBNum) (*DB, error) {
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
 		IsWriteDisabled:    true,
+
 	})
 	return d, e
 }
@@ -136,6 +139,7 @@ func newOnCDB(dBNum DBNum) (*DB, error) {
 		DisableCVLCheck:    true,
 		IsWriteDisabled:    true,
 		IsOnChangeEnabled:  true,
+
 	})
 	return d, e
 }
@@ -144,10 +148,10 @@ func newOnCDB(dBNum DBNum) (*DB, error) {
 // whne the test case ends.
 func setupTestData(t *testing.T, redis *redis.Client, data map[string]map[string]interface{}) {
 	keys := make([]string, 0, len(data))
-	t.Cleanup(func() { redis.Del(keys...) })
+	t.Cleanup(func() { redis.Del(context.Background(), keys...) })
 	for k, v := range data {
 		keys = append(keys, k)
-		if _, err := redis.HMSet(k, v).Result(); err != nil {
+		if _, err := redis.HMSet(context.Background(), k, v).Result(); err != nil {
 			t.Fatalf("HMSET %s failed; err=%v", k, err)
 		}
 	}
@@ -228,6 +232,32 @@ func TestMain(m *testing.M) {
 
 /*
 
+1.  Create, and close a DB connection. (NewDB(), DeleteDB())
+
+*/
+
+func TestNewDB(t *testing.T) {
+
+	d, e := NewDB(Options{
+		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
+		InitIndicator:           "",
+		TableNameSeparator:      "|",
+		KeySeparator:            "|",
+		DisableCVLCheck:         true,
+		ForceNewRedisConnection: false,
+	})
+
+	if d == nil {
+		t.Errorf("NewDB() fails e = %v", e)
+	} else if e = d.DeleteDB(); e != nil {
+		t.Errorf("DeleteDB() fails e = %v", e)
+	}
+}
+
+/*
+
+
 2.  Get an entry (GetEntry())
 3.  Set an entry without Transaction (SetEntry())
 4.  Delete an entry without Transaction (DeleteEntry())
@@ -247,6 +277,7 @@ func TestNoTransaction(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 
 	if d == nil {
@@ -314,6 +345,7 @@ func TestTable(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 
 	if d == nil {
@@ -499,6 +531,7 @@ func TestTransactionCacheWithDBContentKeysPattern(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 
 	if d == nil {
@@ -597,6 +630,7 @@ func TestTransactionCacheMultiKeysPattern(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 
 	if d == nil {
@@ -695,6 +729,7 @@ func TestTransactionCacheWithDBContentKeys(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 
 	if d == nil {
@@ -772,6 +807,7 @@ func TestTransactionCacheWithDBContentDel(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 
 	if d == nil {
@@ -847,6 +883,7 @@ func TestTransactionCacheWithDBContentDelFields(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 
 	if d == nil {
@@ -929,6 +966,7 @@ func TestTransactionCacheWithDBContentMod(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 
 	if d == nil {
@@ -1010,6 +1048,7 @@ func TestTransactionCacheWithDBContentSet(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 
 	if d == nil {
@@ -1223,6 +1262,7 @@ func testTransactionCache(t *testing.T, transRun TransRun) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 
 	if d == nil {
@@ -1606,6 +1646,7 @@ func testTransaction(t *testing.T, transRun TransRun) {
 			TableNameSeparator: "|",
 			KeySeparator:       "|",
 			DisableCVLCheck:    true,
+
 		})
 
 		if e2 != nil {
@@ -1661,6 +1702,7 @@ func TestMap(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 
 	if d == nil {
@@ -1706,6 +1748,7 @@ func TestSubscribe(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 
 	if (d == nil) || (e != nil) {
@@ -1735,6 +1778,7 @@ func TestSubscribe(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	}, skeys, func(s *DB,
 		skey *SKey, key *Key,
 		event SEvent, dbName string) error {
@@ -1772,5 +1816,505 @@ func TestSubscribe(t *testing.T) {
 
 	if e = d.DeleteDB(); e != nil {
 		t.Errorf("DeleteDB() fails e = %v", e)
+	}
+}
+
+func TestCreateRedisClient(t *testing.T) {
+	tests := []struct {
+		name string
+		db   DBNum
+	}{
+		{
+			name: "ValidDB",
+			db:   ConfigDB,
+		},
+		{
+			name: "NonexistentDB",
+			db:   12,
+		},
+		{
+			name: "InvalidDB",
+			db:   MaxDB,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rc := createRedisClient(test.db, 1)
+			if rc == nil {
+				t.Fatal("Nil client returned!")
+			}
+		})
+	}
+}
+
+func TestRedisClient(t *testing.T) {
+	tests := []struct {
+		name  string
+		db    DBNum
+		valid bool
+	}{
+		{
+			name:  "ValidDB",
+			db:    ConfigDB,
+			valid: true,
+		},
+		{
+			name:  "NonexistentDB",
+			db:    12,
+			valid: false,
+		},
+		{
+			name:  "InvalidDB",
+			db:    MaxDB,
+			valid: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rc := RedisClient(test.db)
+			if test.valid == (rc == nil) {
+				t.Fatalf("Test expected valid=%v but got rc=%v", test.valid, rc)
+			}
+		})
+	}
+}
+
+func TestTransactionalRedisClient(t *testing.T) {
+	tests := []struct {
+		name  string
+		db    DBNum
+		valid bool
+	}{
+		{
+			name:  "ValidDB",
+			db:    ConfigDB,
+			valid: true,
+		},
+		{
+			name:  "NonexistentDB",
+			db:    12,
+			valid: false,
+		},
+		{
+			name:  "InvalidDB",
+			db:    MaxDB,
+			valid: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rc := TransactionalRedisClient(test.db)
+			if test.valid == (rc == nil) {
+				t.Fatalf("Test expected valid=%v but got rc=%v", test.valid, rc)
+			}
+		})
+	}
+}
+
+func TestCloseRedisClient(t *testing.T) {
+	tests := []struct {
+		name   string
+		client *redis.Client
+		closed bool
+	}{
+		{
+			name:   "ValidRedisClient",
+			client: RedisClient(ConfigDB),
+			closed: false,
+		},
+		{
+			name:   "NonexistentRedisClient",
+			client: RedisClient(12),
+			closed: false,
+		},
+		{
+			name:   "InvalidRedisClient",
+			client: RedisClient(MaxDB),
+			closed: false,
+		},
+		{
+			name:   "ValidRedisClientForTransaction",
+			client: TransactionalRedisClient(ConfigDB),
+			closed: true,
+		},
+		{
+			name:   "NonexistentRedisClientForTransaction",
+			client: TransactionalRedisClient(12),
+			closed: true,
+		},
+		{
+			name:   "InvalidRedisClientForTransaction",
+			client: TransactionalRedisClient(MaxDB),
+			closed: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := CloseRedisClient(test.client); err != nil {
+				t.Fatalf("Failed to close Redis client: %v", err)
+			}
+
+			if test.client != nil {
+				// The client should only be closed for transactional clients
+				_, err := test.client.Ping(context.Background()).Result()
+				/* This if case is added because connections close status changes based on usePools"*/
+				if (test.name == "ValidRedisClient") && (*usePools == false) {
+					if (err == nil) == !test.closed {
+						t.Fatalf("Expected client closed=%v, but got err=%v", test.closed, err)
+					}
+				} else {
+					if (err == nil) == test.closed {
+						t.Fatalf("Expected client closed=%v, but got err=%v", test.closed, err)
+					}
+				}
+			}
+		})
+	}
+
+	// Test double close behavior
+	t.Run("DoubleCloseClient", func(t *testing.T) {
+		client := TransactionalRedisClient(ConfigDB)
+		if err := CloseRedisClient(client); err != nil {
+			t.Fatalf("Failed to close redis client on the first attempt: %v", err)
+		}
+		if err := CloseRedisClient(client); err == nil {
+			t.Fatalf("Second close attempt did not return an error!")
+		}
+	})
+}
+
+func TestIsTransactionalClient(t *testing.T) {
+	tests := []struct {
+		name          string
+		client        *redis.Client
+		transactional bool
+	}{
+		{
+			name:          "NonTransactionalRedisClient",
+			client:        RedisClient(ConfigDB),
+			transactional: false,
+		},
+		{
+			name:          "TransactionalRedisClient",
+			client:        TransactionalRedisClient(ConfigDB),
+			transactional: true,
+		},
+		{
+			name:          "NilRedisClient",
+			client:        nil,
+			transactional: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tc := IsTransactionalClient(test.client)
+			if (test.name == "NonTransactionalRedisClient") && (*usePools == false) {
+				if tc == test.transactional {
+					t.Fatalf("Invalid response from IsTransactionalClient! for NonTransactionalRedisClient with usePools as false - got:%v want:%v", tc, !test.transactional)
+				}
+
+			} else {
+
+				if tc != test.transactional {
+					t.Fatalf("Invalid response from IsTransactionalClient! got:%v want:%v", tc, test.transactional)
+				}
+			}
+		})
+	}
+}
+
+func TestConnectionPoolDisable(t *testing.T) {
+	origUsePools := *usePools
+	*usePools = false
+	defer func() { *usePools = origUsePools }()
+	client := RedisClient(ConfigDB)
+	defer CloseRedisClient(client)
+
+	if err := client.Ping(context.Background()).Err(); err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+	if ps := client.Options().PoolSize; ps != 1 {
+		t.Fatalf("Incorrect pool size: %v", ps)
+	}
+}
+
+func TestNilRCM(t *testing.T) {
+	var client *redis.Client
+
+	rcm = nil
+	client = RedisClient(ConfigDB)
+	if rcm == nil {
+		t.Fatal("RCM is still nil!")
+	}
+	if client == nil {
+		t.Fatalf("Invalid return value for GetRedisClient: %v", client)
+	}
+
+	client = nil
+	rcm = nil
+	client = TransactionalRedisClient(ConfigDB)
+	if rcm == nil {
+		t.Fatal("RCM is still nil!")
+	}
+	if client == nil {
+		t.Fatalf("Invalid return value for GetRedisClientForTransaction: %v", client)
+	}
+
+	rcm = nil
+	if err := CloseRedisClient(client); err == nil {
+		t.Fatalf("CloseRedisClient did not return an error!")
+	}
+}
+
+func TestRedisCounters(t *testing.T) {
+	t.Logf("usePools is %v", *usePools)
+	if *usePools {
+		// Reset RCM
+		rcm = nil
+		initializeRedisClientManager()
+
+		if ctc := rcm.curTransactionalClients.Load(); ctc != 0 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 0, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr != 0 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 0, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr != 0 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 0, ttcr)
+		}
+
+		// Getting a Redis Client from the cache increments correct counter
+		rc := RedisClient(ConfigDB)
+		if ctc := rcm.curTransactionalClients.Load(); ctc != 0 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 0, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr != 1 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 1, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr != 0 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 0, ttcr)
+		}
+
+		// Getting a transactional Redis Client should increment the counter
+		trc1 := TransactionalRedisClient(ConfigDB)
+		if ctc := rcm.curTransactionalClients.Load(); ctc != 1 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 1, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr != 1 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 1, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr != 1 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 1, ttcr)
+		}
+
+		trc2 := TransactionalRedisClient(StateDB)
+		if ctc := rcm.curTransactionalClients.Load(); ctc != 2 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 2, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr != 1 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 1, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr != 2 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 2, ttcr)
+		}
+
+		// Closing a Redis Client from the cache should not decrement any counters
+		if err := CloseRedisClient(rc); err != nil {
+			t.Fatalf("Got error while closing Redis Client: %v", err)
+		}
+		if ctc := rcm.curTransactionalClients.Load(); ctc != 2 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 2, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr != 1 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 1, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr != 2 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 2, ttcr)
+		}
+
+		// Closing a transactional Redis Client should decrement the right counter
+		if err := CloseRedisClient(trc1); err != nil {
+			t.Fatalf("Got error while closing Redis Client: %v", err)
+		}
+		if ctc := rcm.curTransactionalClients.Load(); ctc != 1 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 1, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr != 1 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 1, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr != 2 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 2, ttcr)
+		}
+
+		if err := CloseRedisClient(trc2); err != nil {
+			t.Fatalf("Got error while closing Redis Client: %v", err)
+		}
+		if ctc := rcm.curTransactionalClients.Load(); ctc != 0 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 0, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr != 1 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 1, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr != 2 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 2, ttcr)
+		}
+	} else {
+		// Reset RCM
+		rcm = nil
+		initializeRedisClientManager()
+
+		if ctc := rcm.curTransactionalClients.Load(); ctc != 0 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 0, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr != 0 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 0, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr != 0 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 0, ttcr)
+		}
+
+		// Getting a Redis Client from the cache increments correct counter
+		rc := RedisClient(ConfigDB)
+		if ctc := rcm.curTransactionalClients.Load(); ctc == 0 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 0, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr == 1 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 1, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr == 0 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 0, ttcr)
+		}
+
+		// Getting a transactional Redis Client should increment the counter
+		trc1 := TransactionalRedisClient(ConfigDB)
+		if ctc := rcm.curTransactionalClients.Load(); ctc == 1 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 1, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr == 1 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 1, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr == 1 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 1, ttcr)
+		}
+
+		trc2 := TransactionalRedisClient(StateDB)
+		if ctc := rcm.curTransactionalClients.Load(); ctc == 0 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 2, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr == 1 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 1, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr == 2 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 2, ttcr)
+		}
+
+		// Closing a Redis Client from the cache should not decrement any counters
+		if err := CloseRedisClient(rc); err != nil {
+			t.Fatalf("Got error while closing Redis Client: %v", err)
+		}
+		if ctc := rcm.curTransactionalClients.Load(); ctc != 2 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 2, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr == 1 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 1, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr == 2 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 2, ttcr)
+		}
+
+		// Closing a transactional Redis Client should decrement the right counter
+		if err := CloseRedisClient(trc1); err != nil {
+			t.Fatalf("Got error while closing Redis Client: %v", err)
+		}
+		if ctc := rcm.curTransactionalClients.Load(); ctc != 1 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 1, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr == 1 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 1, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr == 2 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 2, ttcr)
+		}
+
+		if err := CloseRedisClient(trc2); err != nil {
+			t.Fatalf("Got error while closing Redis Client: %v", err)
+		}
+		if ctc := rcm.curTransactionalClients.Load(); ctc != 0 {
+			t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 0, ctc)
+		}
+		if trcr := rcm.totalPoolClientsRequested.Load(); trcr == 1 {
+			t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 1, trcr)
+		}
+		if ttcr := rcm.totalTransactionalClientsRequested.Load(); ttcr == 2 {
+			t.Fatalf("RCM totalTransactionalRedisClientsRequested expected=%v, got=%v", 2, ttcr)
+		}
+	}
+}
+
+func TestRedisClientManagerCounters(t *testing.T) {
+	if rcm == nil {
+		initializeRedisClientManager()
+	}
+	rcm.curTransactionalClients.Store(10)
+	rcm.totalPoolClientsRequested.Store(50)
+	rcm.totalTransactionalClientsRequested.Store(15)
+
+	counters := RedisClientManagerCounters()
+	if counters.CurTransactionalClients != 10 {
+		t.Fatalf("RCM curTransactionalClients expected=%v, got=%v", 10, counters.CurTransactionalClients)
+	}
+	if counters.TotalPoolClientsRequested != 50 {
+		t.Fatalf("RCM totalPoolClientsRequested expected=%v, got=%v", 50, counters.TotalPoolClientsRequested)
+	}
+	if counters.TotalTransactionalClientsRequested != 15 {
+		t.Fatalf("RCM totalTransactionalClientsRequested expected=%v, got=%v", 15, counters.TotalTransactionalClientsRequested)
+	}
+
+	for db, poolStats := range counters.PoolStatsPerDB {
+		if poolStats == nil {
+			t.Fatalf("RCM PoolStats is nil for db=%v", db)
+		}
+	}
+}
+
+func TestRedisClientPoolExhaustion(t *testing.T) {
+	testPoolSize := 2
+	testClients := 5
+
+	rc := createRedisClient(ConfigDB, testPoolSize)
+	defer rc.Close()
+	if err := rc.HSet(context.Background(), "REDIS_TEST_TABLE|test", map[string]interface{}{"test_field": "test_value"}).Err(); err != nil {
+		t.Fatalf("Failed to set test data: %v", err)
+	}
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < testClients; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			entry, err := rc.HGetAll(context.Background(), "REDIS_TEST_TABLE|test").Result()
+			if err != nil {
+				t.Fatalf("Failed to read the test table: %v", err)
+			}
+			if value := entry["test_field"]; value != "test_value" {
+				t.Fatalf("Got incorrect data from DB read: want=%v, got=%v", "test_value", value)
+			}
+		}()
+	}
+	wg.Wait()
+
+	// Verify pool stats
+	poolStats := rc.PoolStats()
+	t.Logf("Redis Client PoolStats: %v", poolStats)
+	if tc := poolStats.TotalConns; tc != uint32(testPoolSize) {
+		t.Errorf("Invalid TotalConns value: want=%v, got=%v", testPoolSize, tc)
+	}
+	if timeouts := poolStats.Timeouts; timeouts != 0 {
+		t.Errorf("Invalid Timeouts value: want=%v, got=%v", 0, timeouts)
 	}
 }

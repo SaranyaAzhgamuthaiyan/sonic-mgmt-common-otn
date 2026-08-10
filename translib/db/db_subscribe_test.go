@@ -56,6 +56,7 @@ func newCCDB(dBNum DBNum) (*DB, error) {
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
 		IsSession:          true,
+
 	})
 	return d, e
 }
@@ -162,6 +163,7 @@ func TestSubscribeHFunc(t *testing.T) {
 		InitIndicator:      "",
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
+
 	}, sKeys, subHdlr)
 
 	if e != nil {
@@ -322,6 +324,7 @@ func TestSubscribeHFuncSA(t *testing.T) {
 		InitIndicator:      "",
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
+
 	}, sKeys, subHdlrSA)
 
 	if e != nil {
@@ -448,6 +451,7 @@ func TestSubscribeNoCCNotif2HFuncSA(t *testing.T) {
 		InitIndicator:      "",
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
+
 	}, sKeys, subHdlrSA)
 
 	if e != nil {

@@ -98,6 +98,7 @@ func TestNewScanCursor(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    false,
+
 	})
 
 	if (d == nil) || (e != nil) {

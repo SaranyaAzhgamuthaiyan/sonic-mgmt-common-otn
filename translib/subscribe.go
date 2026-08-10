@@ -199,7 +199,8 @@ func Subscribe(req SubscribeRequest) error {
 	paths := req.Paths
 	log.Infof("[%v] Subscribe: paths = %v", sid, paths)
 
-	mdb, err := getAllMdbs(withWriteDisable, withOnChange)
+	mdb, err := getAllMdbs(withWriteDisable, withOnChange, withForceNewRedisConnection)
+
 	if err != nil {
 		return err
 	}

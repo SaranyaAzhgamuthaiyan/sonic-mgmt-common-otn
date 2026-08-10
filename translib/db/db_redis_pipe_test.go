@@ -41,6 +41,7 @@ func newDB(dBNum DBNum) (*DB, error) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		DisableCVLCheck:    true,
+
 	})
 	return d, e
 }

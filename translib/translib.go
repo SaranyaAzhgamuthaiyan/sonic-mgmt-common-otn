@@ -1206,7 +1206,7 @@ func Get(req GetRequest) ([]GetResponse, error) {
 			return allResp.([]GetResponse), err
 		}
 
-		mdb, err = getAllMdbs(withWriteDisable)
+		mdb, err = getAllMdbs(withWriteDisable, withForceNewRedisConnection)
 
 		if err != nil {
 			allResp := ResponseError(TYPE_GET, payload, ProtoErr)
@@ -1326,7 +1326,7 @@ func Action(req ActionRequest) ([]ActionResponse, error) {
 	writeMutex.Lock()
 	defer writeMutex.Unlock()
 
-	mdb, err := getAllMdbs()
+	mdb, err := getAllMdbs(withForceNewRedisConnection)
 
 	if err != nil {
 		allResp := ResponseError(TYPE_ACTION, payload, ProtoErr)
@@ -1793,6 +1793,15 @@ func getDBOptions(dbNo db.DBNum, opts ...func(*db.Options)) db.Options {
 		o.MDBName = "host"
 	}
 
+	switch dbNo {
+	case db.ApplDB, db.CountersDB, db.AsicDB, db.FlexCounterDB, db.LogLevelDB, db.ErrorDB:
+		o.TableNameSeparator = ":"
+		o.KeySeparator = ":"
+	case db.ConfigDB, db.StateDB, db.SnmpDB:
+		o.TableNameSeparator = "|"
+		o.KeySeparator = "|"
+	}
+
 	return o
 }
 
@@ -1809,6 +1818,9 @@ func withWriteDisable(o *db.Options) {
 
 func withOnChange(o *db.Options) {
 	o.IsOnChangeEnabled = true
+}
+func withForceNewRedisConnection(o *db.Options) {
+	o.ForceNewRedisConnection = true
 }
 
 func getAppModule(path string, clientVer Version) (*appInterface, *appInfo, error) {

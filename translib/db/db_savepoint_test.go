@@ -104,6 +104,7 @@ func runSP(t *testing.T, tc *spTC) {
 		KeySeparator:       "|",
 		IsSession:          true,
 		DisableCVLCheck:    true,
+
 	})
 
 	if e != nil {
@@ -215,6 +216,7 @@ func TestSPDeclareSP(t *testing.T) {
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
 		IsSession:          true,
+
 	})
 
 	if e != nil {
