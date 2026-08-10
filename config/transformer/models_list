@@ -16,3 +16,8 @@ gnsi-authz.yang
 gnsi-pathz.yang
 gnsi-certz.yang
 gnsi-credentialz.yang
+openconfig-optical-amplifier.yang
+openconfig-optical-amplifier-annot.yang
+openconfig-optical-attenuator.yang
+openconfig-optical-attenuator-annot.yang
+openconfig-transport-line-common.yang
