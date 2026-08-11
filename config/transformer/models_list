@@ -11,6 +11,12 @@ openconfig-mclag.yang
 openconfig-sampling-sflow-annot.yang
 openconfig-sampling-sflow.yang
 openconfig-system-annot.yang
+openconfig-system.yang
+openconfig-platform.yang
+openconfig-platform-annot.yang
+openconfig-platform-transceiver.yang
+openconfig-telemetry.yang
+openconfig-telemetry-annot.yang
 openconfig-vlan.yang
 gnsi-authz.yang
 gnsi-pathz.yang
