@@ -16,3 +16,6 @@ gnsi-authz.yang
 gnsi-pathz.yang
 gnsi-certz.yang
 gnsi-credentialz.yang
+openconfig-terminal-device.yang
+openconfig-terminal-device-annot.yang
+openconfig-terminal-device-deviation.yang
