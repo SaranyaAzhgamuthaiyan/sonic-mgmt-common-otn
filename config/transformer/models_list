@@ -16,3 +16,12 @@ gnsi-authz.yang
 gnsi-pathz.yang
 gnsi-certz.yang
 gnsi-credentialz.yang
+openconfig-channel-monitor.yang
+openconfig-channel-monitor-annot.yang
+openconfig-wavelength-router.yang
+openconfig-wavelength-router-annot.yang
+openconfig-wavelength-router-deviation.yang
+openconfig-transport-line-protection.yang
+openconfig-transport-line-protection-annot.yang
+openconfig-optical-time-domain-reflectometer.yang
+openconfig-optical-time-domain-reflectometer-annot.yang
