@@ -33,7 +33,8 @@ import (
 )
 
 /*
-#cgo LDFLAGS: -lyang
+#cgo CFLAGS: -I/usr/local/include/libyang
+#cgo LDFLAGS: -L/usr/local/lib -lyang
 #include <libyang/libyang.h>
 #include <libyang/tree_data.h>
 #include <stdlib.h>

@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-
 	"runtime"
 	"strings"
 	"sync"
@@ -33,13 +32,13 @@ import (
 	cmn "github.com/Azure/sonic-mgmt-common/cvl/common"
 	custv "github.com/Azure/sonic-mgmt-common/cvl/custom_validation"
 	"github.com/Azure/sonic-mgmt-common/cvl/internal/yparser"
-	"github.com/go-redis/redis/v7"
+	"github.com/antchfx/xmlquery"
 	"github.com/google/go-cmp/cmp"
-	toposort "github.com/philopon/go-toposort"
+	"github.com/philopon/go-toposort"
+	"github.com/redis/go-redis/v9"
 
 	//lint:ignore ST1001 This is safe to dot import for util package
 	. "github.com/Azure/sonic-mgmt-common/cvl/internal/util"
-	"github.com/antchfx/xmlquery"
 )
 
 var cvlErrorMap = map[CVLRetCode]string{
@@ -298,6 +297,7 @@ func (c *CVL) ValidateEditConfig(cfgData []cmn.CVLEditConfigData) (cvlErr CVLErr
 		panic(c.dbAccess)
 	}
 
+	CVL_LOG(INFO_DEBUG, "ValidateEditConfig: Namespace:%s", c.dbAccess.GetMDBName())
 	ts := time.Now()
 
 	defer func() {
