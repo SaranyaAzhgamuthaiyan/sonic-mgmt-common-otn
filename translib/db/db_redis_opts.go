@@ -20,7 +20,6 @@
 package db
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"reflect"
@@ -79,7 +78,11 @@ func setGoRedisOpts(optsString string) {
 // options, values passed via db Options, and TRANSLIB_DB|default settings.
 // Additionally it also adjusts the passed dbOpts for separator.
 func adjustRedisOpts(dbOpt *Options) *redis.Options {
-	dbRedisOptsConfig.reconfigure()
+	mdbName := dbOpt.MDBName
+	if mdbName == "" {
+		mdbName = "host"
+	}
+	dbRedisOptsConfig.reconfigure(mdbName)
 	mutexRedisOptsConfig.Lock()
 	redisOpts := dbRedisOptsConfig.opts
 	mutexRedisOptsConfig.Unlock()
@@ -90,6 +93,8 @@ func adjustRedisOpts(dbOpt *Options) *redis.Options {
 	dbId := int(dbOpt.DBNo)
 	dbPassword := ""
 	if dbInstName := getDBInstName(dbOpt.DBNo); dbInstName != "" {
+		// Appending the namespace along with DBName
+		dbInstName = dbInstName + "." + mdbName
 		if isDbInstPresent(dbInstName) {
 			if dbSock = getDbSock(dbInstName); dbSock != "" {
 				dbNetwork = DefaultRedisUNIXNetwork
@@ -153,7 +158,7 @@ func initializeRedisOpts() {
 //  Configure DB Redis Opts                                                   //
 ////////////////////////////////////////////////////////////////////////////////
 
-func (config *_DBRedisOptsConfig) reconfigure() error {
+func (config *_DBRedisOptsConfig) reconfigure(multiDbName string) error {
 
 	mutexRedisOptsConfig.Lock()
 	// Handle command line options after they are parsed.
@@ -174,7 +179,7 @@ func (config *_DBRedisOptsConfig) reconfigure() error {
 	if doReconfigure {
 		glog.Infof("_DBRedisOptsConfig:reconfigure: Handling signal.")
 		var readDBRedisOptsConfig _DBRedisOptsConfig
-		readDBRedisOptsConfig.readFromDB()
+		readDBRedisOptsConfig.readFromDB(multiDbName)
 
 		mutexRedisOptsConfig.Lock()
 		if !reflect.DeepEqual(*config, readDBRedisOptsConfig) {
@@ -197,10 +202,8 @@ func (config *_DBRedisOptsConfig) handleReconfigureSignal() error {
 //  Read DB Redis Options Configuration                                       //
 ////////////////////////////////////////////////////////////////////////////////
 
-func (config *_DBRedisOptsConfig) readFromDB() error {
-	rc := TransactionalRedisClient(ConfigDB)
-	defer CloseRedisClient(rc)
-	fields, e := rc.HGetAll(context.Background(), "TRANSLIB_DB|default").Result()
+func (config *_DBRedisOptsConfig) readFromDB(multiDbName string) error {
+	fields, e := readRedis("TRANSLIB_DB|default", multiDbName)
 	if e == nil {
 		if optsString, ok := fields["go_redis_opts"]; ok {
 			// Parse optsString into config.opts

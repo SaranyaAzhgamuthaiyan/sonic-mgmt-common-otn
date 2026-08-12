@@ -37,11 +37,12 @@ import (
 )
 
 const (
-	configDBLock   string = "config_db_lock"
-	lockTable      string = "LOCK"
-	lockKey        string = "translib"
-	lockTableKey   string = lockTable + "|" + lockKey
-	noSessionToken string = "0-0"
+	configDBLock       string = "ConfigDBLock"
+	legacyConfigDBLock string = "config_db_lock"
+	lockTable          string = "LOCK"
+	lockKey            string = "translib"
+	lockTableKey       string = lockTable + "|" + lockKey
+	noSessionToken     string = "0-0"
 
 	tryLockAttempt int           = 4
 	tryLockPause   time.Duration = 200
@@ -61,19 +62,19 @@ type LockStruct struct {
 	lockStruct
 }
 
-func (lt *LockStruct) tryLock() error {
+func (lt *LockStruct) tryLock(multiDbName string) error {
 	var err error
 	var client *redis.Client
 	var reply interface{}
 
 	if (lt == nil) || lt.locked {
 		err = tlerr.TranslibDBNotSupported{}
-		glog.Errorf("tryLock: %v: %v", lt, err)
+		glog.Errorf("tryLock:%v: %v: %v", multiDbName, lt, err)
 		return err
 	}
 
 	// Create The State DB Connection.
-	if client, err = getStateDB(); err != nil {
+	if client, err = getStateDB(multiDbName); err != nil {
 		return err
 	}
 	defer CloseRedisClient(client)
@@ -81,7 +82,7 @@ func (lt *LockStruct) tryLock() error {
 	// HSETNX: Set Hash Field if Not Exist
 	args := []interface{}{"HSETNX", lockTableKey, lt.Name,
 		lt.comm + ":" + lt.Id}
-	glog.V(3).Info("tryLock: RedisCmd: STATE_DB: ", args)
+	glog.V(3).Infof("tryLock: RedisCmd: STATE_DB: %v, MultiDbName: %v", args, multiDbName)
 	if reply, err = client.Do(context.Background(), args...).Result(); err == nil {
 		if intReply, ok := reply.(int64); !ok {
 			glog.Errorf("tryLock: Reply %v Not int64: %v Type: %v",
@@ -101,7 +102,7 @@ func (lt *LockStruct) tryLock() error {
 	return err
 }
 
-func (lt *LockStruct) unlock() error {
+func (lt *LockStruct) unlock(multiDbName string) error {
 	var err error
 	var client *redis.Client
 	var reply interface{}
@@ -113,7 +114,7 @@ func (lt *LockStruct) unlock() error {
 	}
 
 	// Create The State DB Connection.
-	if client, err = getStateDB(); err != nil {
+	if client, err = getStateDB(multiDbName); err != nil {
 		return err
 	}
 	defer CloseRedisClient(client)
@@ -124,14 +125,14 @@ func (lt *LockStruct) unlock() error {
 		[]string{lt.Name, lt.comm, lt.Id}).Result(); err == nil {
 
 		if intReply, ok := reply.(int64); !ok {
-			glog.Errorf("unlock: Reply %v Not int64: %v Type: %v",
+			glog.Errorf("unlock Reply %v Not int64: %v Type: %v",
 				lt, reply, reflect.TypeOf(reply))
 			err = tlerr.TranslibDBScriptFail{Description: "Unexpected response"}
 		} else if intReply == 1 {
 			lt.locked = false
-			glog.Infof("unlock: Unlocked: %s:%s", lt.Name, lt.Id)
+			glog.Infof("unlock:%v Unlocked: %s", lt.Name, lt.Id)
 		} else {
-			glog.Info("unlock: Already Unlocked")
+			glog.Infof("unlock:%v Already Unlocked", multiDbName)
 			err = tlerr.TranslibDBLock{}
 		}
 	}
@@ -168,59 +169,86 @@ func (lt *LockStruct) dbLockedError(c *redis.Client) error {
 	return tlerr.TranslibDBLock{Type: lockType}
 }
 
-var cdbLock *LockStruct
+// Define a global map to hold locks for multiple multiDbNames.
+var cdbLock map[string]*LockStruct
 
-func ConfigDBTryLock(token string) error {
+// Initialize the global map for storing locks
+func init() {
+	cdbLock = make(map[string]*LockStruct)
+}
+
+// ConfigDBTryLock tries to acquire a lock for the given multiDbName.
+// It uses a map to store locks for multiple multiDbNames.
+func ConfigDBTryLock(token string, multiDbName string) error {
 	var err error
-	glog.Info("ConfigDBTryLock:")
+	var ls map[string]*LockStruct // Local lock struct map for this invocation
+
+	glog.Infof("ConfigDBTryLock: mdbname:%v", multiDbName)
+
 	if bool(glog.V(3)) || !flag.Parsed() {
-		dumpStack(7, 13) // Skip the stack frames upto NewDB()
+		dumpStack(7, 13)
 	} else {
 		dumpStack(9, 10)
 	}
 
-	// If len(token) == 0, this is not a configure session. (Eg: exec mode
-	// configure replace)
-	if cdbLock != nil {
-		err = cdbLock.dbLockedError(nil)
-	} else {
-		ls := LockStruct{Name: configDBLock, Id: token,
-			lockStruct: lockStruct{comm: execName}}
-		for attempts := 0; attempts < tryLockAttempt; attempts++ {
-			if err = ls.tryLock(); err == nil {
-				cdbLock = &ls
-				break
-			} else if lErr, ok := err.(tlerr.TranslibDBLock); ok && lErr.Type == tlerr.DBLockConfigSession {
-				break
-			} else if (attempts + 1) == tryLockAttempt {
-				break
-			}
-			glog.Infof("ConfigDBTryLock: Pausing %d ms", tryLockPause)
-			time.Sleep(tryLockPause * time.Millisecond)
-			glog.Infof("ConfigDBTryLock: Retrying Attempt %d", attempts)
+	// If a lock for the given multiDbName already exists, return an error.
+	if existingLock, exists := cdbLock[multiDbName]; exists && existingLock != nil {
+		return existingLock.dbLockedError(nil)
+	}
+
+	// Create a new LockStruct map if it's nil (this will hold the lock for this session).
+	if ls == nil {
+		ls = make(map[string]*LockStruct)
+	}
+
+	// If the lock for the given multiDbName doesn't exist, create it.
+	if _, ok := ls[multiDbName]; !ok {
+		ls[multiDbName] = &LockStruct{Name: configDBLock, Id: token, lockStruct: lockStruct{comm: execName}}
+	}
+
+	// Try to acquire the lock for the given multiDbName
+	for attempts := 0; attempts < tryLockAttempt; attempts++ {
+		err = ls[multiDbName].tryLock(multiDbName)
+
+		if err == nil {
+			cdbLock[multiDbName] = ls[multiDbName]
+			break
+		} else if lErr, ok := err.(tlerr.TranslibDBLock); ok && lErr.Type == tlerr.DBLockConfigSession {
+			break
+		} else if (attempts + 1) == tryLockAttempt {
+			break
 		}
+
+		glog.Infof("ConfigDBTryLock: Pausing %d ms", tryLockPause)
+		time.Sleep(tryLockPause * time.Millisecond)
+		glog.Infof("ConfigDBTryLock: Retrying Attempt %d", attempts)
 	}
 
 	if err != nil {
 		glog.Error("ConfigDBTryLock: Error", err)
 	}
+
 	return err
 }
 
-func ConfigDBUnlock(token string) error {
+func ConfigDBUnlock(token string, multiDBName string) error {
 	var err error
-	glog.Info("ConfigDBUnlock:")
+	glog.Infof("ConfigDBUnlock:%v", multiDBName)
 	if bool(glog.V(3)) || !flag.Parsed() {
 		dumpStack(7, 13) // Skip the stack frames upto DeleteDB()
 	} else {
 		dumpStack(9, 10)
 	}
 
-	if cdbLock == nil {
+	if lock, exists := cdbLock[multiDBName]; exists && lock != nil {
+		// Lock exists, unlock it
+		err = lock.unlock(multiDBName)
+
+		// Clear the lock from the map
+		cdbLock[multiDBName] = nil
+	} else {
+		// Lock doesn't exist, handle the error
 		err = tlerr.TranslibDBLock{}
-	} else if cdbLock != nil {
-		err = cdbLock.unlock()
-		cdbLock = nil
 	}
 
 	if err != nil {
@@ -229,18 +257,31 @@ func ConfigDBUnlock(token string) error {
 	return err
 }
 
+func clearLockField(multiDbName string, fieldName string) error {
+	err := (&LockStruct{Name: fieldName, Id: "*",
+		lockStruct: lockStruct{comm: execName, locked: true}}).unlock(multiDbName)
+
+	// Clearing an absent lock is ok.
+	if _, ok := err.(tlerr.TranslibDBLock); ok {
+		glog.Infof("ConfigDBClearLock: Lock absent for field %q namespace %q", fieldName, multiDbName)
+		err = nil
+	}
+	return err
+}
+
 func ConfigDBClearLock() error {
 	var err error
 	glog.Info("ConfigDBClearLock:")
 
-	err = (&LockStruct{Name: configDBLock, Id: "*",
-		lockStruct: lockStruct{comm: execName, locked: true}}).unlock()
-	cdbLock = nil
-
-	// Clearing an absent lock is ok.
-	if _, ok := err.(tlerr.TranslibDBLock); ok {
-		glog.Info("ConfigDBClearLock: Lock Absent")
-		err = nil
+	multiDbNames := GetMultiDbNames()
+	for _, multiDbName := range multiDbNames {
+		if err = clearLockField(multiDbName, configDBLock); err != nil {
+			break
+		}
+		if err = clearLockField(multiDbName, legacyConfigDBLock); err != nil {
+			break
+		}
+		cdbLock[multiDbName] = nil
 	}
 	return err
 }
@@ -262,12 +303,13 @@ func dumpStack(begin, end int) {
 	}
 }
 
-func getStateDB() (*redis.Client, error) {
+func getStateDB(multiDbName string) (*redis.Client, error) {
 	var client *redis.Client
 	var err error
-	if client = TransactionalRedisClient(StateDB); client == nil {
+	if client = redis.NewClient(adjustRedisOpts(&Options{
+		DBNo: StateDB, MDBName: multiDbName})); client == nil {
 
-		glog.Error("getStateDB: Could not create redis client: STATE_DB")
+		glog.Error("getStateDB: Could not create redis client: STATE_DB for:", multiDbName)
 		err = tlerr.TranslibDBCannotOpen{}
 	}
 	return client, err

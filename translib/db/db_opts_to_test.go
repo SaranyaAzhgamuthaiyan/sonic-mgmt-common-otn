@@ -42,14 +42,26 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+func killRedisScripts(dbName string) {
+	client, err := getStateDB(dbName)
+	if err != nil {
+		return
+	}
+	defer CloseRedisClient(client)
+	client.ScriptKill(context.Background())
+}
+
 func TestDefaultTimeout(t *testing.T) {
 
 	var pid int = os.Getpid()
+
+	killRedisScripts(hostDBName)
 
 	t.Logf("TestDefaultTimeout: %s: begin", time.Now().String())
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -113,10 +125,13 @@ func blockLUAScript(wg *sync.WaitGroup, secs int, t *testing.T) {
 
 	defer wg.Done()
 
+	killRedisScripts(hostDBName)
+
 	t.Logf("blockLUAScript: %s: begin: secs: %v", time.Now().String(), secs)
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
