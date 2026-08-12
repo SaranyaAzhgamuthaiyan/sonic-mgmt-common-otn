@@ -165,7 +165,7 @@ func (c *cvlDBAccess) Lookup(s ctypes.Search) ctypes.JsonResult {
 		return strResult{"", err}
 	}
 
-	v, err := cvl.RunLua(
+	v, err := cvl.RunLua(c.Db.client,
 		"filter_entries",
 		s.Pattern,
 		strings.Join(s.KeyNames, "|"),
@@ -188,7 +188,7 @@ func (c *cvlDBAccess) Count(s ctypes.Search) ctypes.IntResult {
 		return intResult{0, err}
 	}
 	// Advanced key search, with match criteria on has values
-	v, err := cvl.RunLua(
+	v, err := cvl.RunLua(c.Db.client,
 		"count_entries",
 		s.Pattern,
 		strings.Join(s.KeyNames, "|"),
@@ -506,6 +506,13 @@ func (p *dbAccessPipe) Exec() error {
 		log.Infof("dbAccessPipe: updated: pipe query list: %v; cmder: %v; error: %v", p.qryResList, cmder, err)
 	}
 	return err
+}
+
+func (cvl *cvlDBAccess) GetMDBName() string {
+	if log.V(5) {
+		log.Infof("cvlDBAccess: GetMDBName: %s", cvl.Db.Opts.MDBName)
+	}
+	return cvl.Db.Opts.MDBName
 }
 
 func (p *dbAccessPipe) Close() {

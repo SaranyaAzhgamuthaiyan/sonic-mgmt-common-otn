@@ -41,6 +41,7 @@ func TestOnChangeCacheReg(t *testing.T) {
 	t.Run("occDisable", func(t *testing.T) {
 		d := newTestDB(t, Options{
 			DBNo:                    ConfigDB,
+			MDBName:                 hostDBName,
 			IsWriteDisabled:         true,
 			ForceNewRedisConnection: false,
 			KeySeparator:            "|",
@@ -56,6 +57,7 @@ func TestOnChangeCacheReg(t *testing.T) {
 	t.Run("occEnable", func(t *testing.T) {
 		d := newTestDB(t, Options{
 			DBNo:                    ConfigDB,
+			MDBName:                 hostDBName,
 			IsWriteDisabled:         true,
 			IsOnChangeEnabled:       true,
 			ForceNewRedisConnection: false,
@@ -75,6 +77,7 @@ func TestOnChangeCacheReg(t *testing.T) {
 	t.Run("writeEnable", func(t *testing.T) {
 		_, err := NewDB(Options{
 			DBNo:                    ConfigDB,
+			MDBName:                 hostDBName,
 			IsOnChangeEnabled:       true,
 			ForceNewRedisConnection: false,
 			KeySeparator:            "|",
@@ -87,9 +90,9 @@ func TestOnChangeCacheReg(t *testing.T) {
 
 func TestOnChangeCache(t *testing.T) {
 	// OnChange cache enabled db
-	d := newTestDB(t, Options{DBNo: ConfigDB, IsWriteDisabled: true, IsOnChangeEnabled: true, ForceNewRedisConnection: false, KeySeparator: "|"})
+	d := newTestDB(t, Options{DBNo: ConfigDB, MDBName: hostDBName, IsWriteDisabled: true, IsOnChangeEnabled: true, ForceNewRedisConnection: false, KeySeparator: "|"})
 	// Writale db to write test keys
-	dw := newTestDB(t, Options{DBNo: ConfigDB, DisableCVLCheck: true, ForceNewRedisConnection: false, KeySeparator: "|"})
+	dw := newTestDB(t, Options{DBNo: ConfigDB, MDBName: hostDBName, DisableCVLCheck: true, ForceNewRedisConnection: false, KeySeparator: "|"})
 
 	tsA := &TableSpec{Name: "TESTOCC_A"}
 	tsB := &TableSpec{Name: "TESTOCC_B"}

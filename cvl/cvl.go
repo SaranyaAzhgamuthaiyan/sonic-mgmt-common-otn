@@ -20,24 +20,25 @@
 package cvl
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
+	"unsafe"
 
 	cmn "github.com/Azure/sonic-mgmt-common/cvl/common"
+	custv "github.com/Azure/sonic-mgmt-common/cvl/custom_validation"
 	"github.com/Azure/sonic-mgmt-common/cvl/internal/yparser"
 	"github.com/antchfx/jsonquery"
 	"github.com/antchfx/xmlquery"
 	"github.com/antchfx/xpath"
-	"github.com/go-redis/redis/v7"
-	"io/ioutil"
-	"path/filepath"
-	"sync"
-	"unsafe"
+	"github.com/redis/go-redis/v9"
 
-	custv "github.com/Azure/sonic-mgmt-common/cvl/custom_validation"
 	//lint:ignore ST1001 This is safe to dot import for util package
 	. "github.com/Azure/sonic-mgmt-common/cvl/internal/util"
 )
@@ -251,7 +252,7 @@ func init() {
 	//Intialize mutex for stats
 	statsMutex = &sync.Mutex{}
 
-	_, err := redisClient.ConfigSet("notify-keyspace-events", "AKE").Result()
+	_, err := redisClient.ConfigSet(context.Background(), "notify-keyspace-events", "AKE").Result()
 	if err != nil {
 		CVL_LOG(WARNING, "Could not enable notification error %s", err)
 	}
@@ -290,7 +291,7 @@ func loadSchemaFiles() CVLRetCode {
 	// This is needed to apply deviation file
 	retryCnt := 0
 	for ; retryCnt < MAX_DEVICE_METADATA_FETCH_RETRY; retryCnt++ {
-		deviceMetaDataKey, err := redisClient.Keys("DEVICE_METADATA|localhost").Result()
+		deviceMetaDataKey, err := redisClient.Keys(context.Background(), "DEVICE_METADATA|localhost").Result()
 		if (err != nil) || (len(deviceMetaDataKey) == 0) {
 			//Retry for 1 min
 			time.Sleep(100 * time.Millisecond) //sleep for 1 sec and then retry
@@ -303,7 +304,7 @@ func loadSchemaFiles() CVLRetCode {
 
 	//Now try to fetch the platform details
 	if retryCnt < MAX_DEVICE_METADATA_FETCH_RETRY {
-		deviceMetaData, err := redisClient.HGetAll("DEVICE_METADATA|localhost").Result()
+		deviceMetaData, err := redisClient.HGetAll(context.Background(), "DEVICE_METADATA|localhost").Result()
 		var exists bool
 		platformName, exists = deviceMetaData["platform"]
 		if !exists || (err != nil) || (platformName == "") {
@@ -1125,7 +1126,8 @@ func (c *CVL) doCustomValidation(node *xmlquery.Node,
 			YNodeVal:  nodeVal,
 			YCur:      node,
 			SessCache: &(c.custvCache),
-			RClient:   c.dbAccess}
+			RClient:   c.dbAccess,
+			NameSpace: c.dbAccess.GetMDBName()}
 		for _, custFunction := range custFuncs {
 			CVL_LOG(INFO_TRACE, "Calling custom validation function %s", custFunction)
 			errObj := custv.InvokeCustomValidation(&custv.CustomValidation{}, custFunction, pCustv)
