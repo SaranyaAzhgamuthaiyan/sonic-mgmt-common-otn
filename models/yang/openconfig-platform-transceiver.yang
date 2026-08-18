@@ -281,7 +281,6 @@ module openconfig-platform-transceiver {
         component and the module-functional-type is
         TYPE_DIGITAL_COHERENT_OPTIC this grouping will NOT be used
         as the data will be within the optical-channel.";
-
     }
   }
 
@@ -436,24 +435,6 @@ module openconfig-platform-transceiver {
         "Receiver clock-and-data-recovery loss-of-lock flag.";
       reference "QSFP-DD CMIS 5.0 Table 8-78";
     }
-
-    uses physical-channel-state-extended {
-      when "../../../state/module-functional-type = 'oc-opt-types:TYPE_STANDARD_OPTIC'" {
-        description
-          "When the physical channel is of TYPE_STANDARD_OPTIC, the
-          extended state will be used";
-      }
-    }
-  }
-
-  grouping physical-channel-state-extended {
-    description
-      "Extended operational state data for physical client channels
-      for applications where the full physical channel config and
-      state are used. In some cases, such as when the physical
-      channel has a leafref to an optical channel component and the
-      module-functional-type is TYPE_DIGITAL_COHERENT_OPTIC this
-      grouping will NOT be used.";
 
     uses output-optical-frequency;
     uses optical-power-state;

@@ -15,6 +15,7 @@ openconfig-system.yang
 openconfig-platform.yang
 openconfig-platform-annot.yang
 openconfig-platform-transceiver.yang
+openconfig-platform-transceiver-ext.yang
 openconfig-telemetry.yang
 openconfig-telemetry-annot.yang
 openconfig-vlan.yang
