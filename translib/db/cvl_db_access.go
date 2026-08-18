@@ -509,6 +509,9 @@ func (p *dbAccessPipe) Exec() error {
 }
 
 func (cvl *cvlDBAccess) GetMDBName() string {
+	if cvl == nil || cvl.Db == nil {
+		return ""
+	}
 	if log.V(5) {
 		log.Infof("cvlDBAccess: GetMDBName: %s", cvl.Db.Opts.MDBName)
 	}
