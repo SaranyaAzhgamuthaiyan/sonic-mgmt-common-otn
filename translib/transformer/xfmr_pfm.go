@@ -200,10 +200,19 @@ var pfm_post_xfmr PostXfmrFunc = func(inParams XfmrParams) error {
 
 				for keyName := range retDbDataMap[table] {
 					// Only add if not already present in dbDataMap
-					if _, exists := retDbDataMap[OC_COMPONENT_TBL][keyName]; !exists {
-						log.Infof("pfm_post_xfmr: Adding key %v to OC_COMPONENT_TBL", keyName)
-						retDbDataMap[OC_COMPONENT_TBL][keyName] = db.Value{} // empty value marks new entry
+					if _, exists := retDbDataMap[OC_COMPONENT_TBL][keyName]; exists {
+						continue
 					}
+					// Skip empty OC_COMPONENT if the key already exists in Redis.
+					if inParams.d != nil {
+						existing, err := inParams.d.GetEntry(&db.TableSpec{Name: OC_COMPONENT_TBL}, db.Key{Comp: []string{keyName}})
+						if err == nil && existing.IsPopulated() {
+							log.Infof("pfm_post_xfmr: Skipping OC_COMPONENT add for existing key %v", keyName)
+							continue
+						}
+					}
+					log.Infof("pfm_post_xfmr: Adding key %v to OC_COMPONENT_TBL", keyName)
+					retDbDataMap[OC_COMPONENT_TBL][keyName] = db.Value{} // empty value marks new entry
 				}
 			}
 		}
