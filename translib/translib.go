@@ -431,8 +431,9 @@ func Create(req SetRequest) (SetResponse, error) {
 		}
 
 		if ENABLE_TRANSLIB_ROLLBACK == "true" {
-
+			ctx.d.Opts.DisableCVLCheck = true
 			err = (*app).processPreparePhase(ctx.d, ctx.nsPayload.Key)
+			ctx.d.Opts.DisableCVLCheck = false
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -444,7 +445,9 @@ func Create(req SetRequest) (SetResponse, error) {
 		}
 		resp, err = (*app).processCreate(ctx.d)
 		if err != nil {
-			ctx.d.AbortTx()
+			if abortTxErr := ctx.d.AbortTx(); abortTxErr != nil {
+				log.Infof("Create: AbortTx failed for namespace=%s: %v", ctx.nameSpace, abortTxErr)
+			}
 			resp.ErrSrc = AppErr
 			abortErr := abortTransactions(redisMdbInstances)
 			if abortErr != nil {
@@ -464,12 +467,12 @@ func Create(req SetRequest) (SetResponse, error) {
 		for ns, redisDbInstance := range redisMdbInstances {
 			for _, payload := range namespacePayloads {
 				if payload.Namespace == ns && payload.Commited {
-					// Pass the payload.Key for rollback
-					log.Infof("Rollback key:%v,Namespace: %s", payload.Namespace, payload.Key)
+					log.Infof("Rollback key:%v, Namespace: %s", payload.Key, payload.Namespace)
 					err = (*app).rollback(redisDbInstance)
 					if err != nil {
 						log.Infof("Rollback operation failed!")
 					}
+					break
 				}
 			}
 		}
@@ -659,7 +662,9 @@ func Update(req SetRequest) (SetResponse, error) {
 		}
 
 		if ENABLE_TRANSLIB_ROLLBACK == "true" {
+			ctx.d.Opts.DisableCVLCheck = true
 			err = (*app).processPreparePhase(ctx.d, ctx.nsPayload.Key)
+			ctx.d.Opts.DisableCVLCheck = false
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -671,7 +676,9 @@ func Update(req SetRequest) (SetResponse, error) {
 		}
 		resp, err = (*app).processUpdate(ctx.d)
 		if err != nil {
-			ctx.d.AbortTx()
+			if abortTxErr := ctx.d.AbortTx(); abortTxErr != nil {
+				log.Infof("Update: AbortTx failed for namespace=%s: %v", ctx.nameSpace, abortTxErr)
+			}
 			resp.ErrSrc = AppErr
 			abortErr := abortTransactions(redisMdbInstances)
 			if abortErr != nil {
@@ -692,11 +699,12 @@ func Update(req SetRequest) (SetResponse, error) {
 		for ns, redisDbInstance := range redisMdbInstances {
 			for _, payload := range namespacePayloads {
 				if payload.Namespace == ns && payload.Commited {
-					log.Infof("Rollback key:%v,Namespace: %s", payload.Namespace, payload.Key)
+					log.Infof("Rollback key:%v, Namespace: %s", payload.Key, payload.Namespace)
 					err = (*app).rollback(redisDbInstance)
 					if err != nil {
 						log.Infof("Rollback operation failed!")
 					}
+					break
 				}
 			}
 		}
@@ -885,7 +893,9 @@ func Replace(req SetRequest) (SetResponse, error) {
 		}
 
 		if ENABLE_TRANSLIB_ROLLBACK == "true" {
+			ctx.d.Opts.DisableCVLCheck = true
 			err = (*app).processPreparePhase(ctx.d, ctx.nsPayload.Key)
+			ctx.d.Opts.DisableCVLCheck = false
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -898,7 +908,9 @@ func Replace(req SetRequest) (SetResponse, error) {
 
 		resp, err = (*app).processReplace(ctx.d)
 		if err != nil {
-			ctx.d.AbortTx()
+			if abortTxErr := ctx.d.AbortTx(); abortTxErr != nil {
+				log.Infof("Replace: AbortTx failed for namespace=%s: %v", ctx.nameSpace, abortTxErr)
+			}
 			resp.ErrSrc = AppErr
 			abortErr := abortTransactions(redisMdbInstances)
 			if abortErr != nil {
@@ -919,11 +931,12 @@ func Replace(req SetRequest) (SetResponse, error) {
 		for ns, redisDbInstance := range redisMdbInstances {
 			for _, payload := range namespacePayloads {
 				if payload.Namespace == ns && payload.Commited {
-					log.Infof("Rollback key:%v,Namespace: %s", payload.Namespace, payload.Key)
+					log.Infof("Rollback key:%v, Namespace: %s", payload.Key, payload.Namespace)
 					err = (*app).rollback(redisDbInstance)
 					if err != nil {
 						log.Infof("Rollback operation failed!")
 					}
+					break
 				}
 			}
 		}
@@ -1093,7 +1106,9 @@ func Delete(req SetRequest) (SetResponse, error) {
 
 		if ENABLE_TRANSLIB_ROLLBACK == "true" {
 			log.Infof("Delete: PHASE 2 - Calling processPreparePhase for namespace=%s", ctx.nameSpace)
+			ctx.d.Opts.DisableCVLCheck = true
 			err = (*app).processPreparePhase(ctx.d, ctx.nsPayload.Key)
+			ctx.d.Opts.DisableCVLCheck = false
 			if err != nil {
 				resp.ErrSrc = AppErr
 				abortErr := abortTransactions(redisMdbInstances)
@@ -1106,7 +1121,9 @@ func Delete(req SetRequest) (SetResponse, error) {
 		}
 		resp, err = (*app).processDelete(ctx.d)
 		if err != nil {
-			ctx.d.AbortTx()
+			if abortTxErr := ctx.d.AbortTx(); abortTxErr != nil {
+				log.Infof("Delete: AbortTx failed for namespace=%s: %v", ctx.nameSpace, abortTxErr)
+			}
 			resp.ErrSrc = AppErr
 			abortErr := abortTransactions(redisMdbInstances)
 			if abortErr != nil {
@@ -1127,11 +1144,12 @@ func Delete(req SetRequest) (SetResponse, error) {
 		for ns, redisDbInstance := range redisMdbInstances {
 			for _, payload := range namespacePayloads {
 				if payload.Namespace == ns && payload.Commited {
-					log.Infof("Rollback key:%v,Namespace: %s", payload.Namespace, payload.Key)
+					log.Infof("Rollback key:%v, Namespace: %s", payload.Key, payload.Namespace)
 					err = (*app).rollback(redisDbInstance)
 					if err != nil {
 						log.Infof("Rollback operation failed!")
 					}
+					break
 				}
 			}
 		}
@@ -1633,7 +1651,9 @@ func Bulk(req BulkRequest) (BulkResponse, error) {
 		}
 
 		if ENABLE_TRANSLIB_ROLLBACK == "true" {
+			ctx.d.Opts.DisableCVLCheck = true
 			err = (*ctx.app).processPreparePhase(ctx.d, ctx.keyStr)
+			ctx.d.Opts.DisableCVLCheck = false
 			if err != nil {
 				errSrc = AppErr
 				goto BulkError2
@@ -1682,24 +1702,37 @@ func Bulk(req BulkRequest) (BulkResponse, error) {
 
 	log.Infof("Bulk: PHASE 2 complete - all namespaces written successfully, proceeding to commit")
 
-	// COMMIT PHASE
-	cerr := commitTransactions(redisMdbInstances, namespacePayloads)
-
-	// POST-COMMIT or ROLLBACK
+	var allNamespacePayloads []NamespacePayload
 	for _, ctx := range writeContexts {
-		app := ctx.app
-		namespacePayloads := ctx.namespacePayloads
+		exists := false
+		for _, payload := range allNamespacePayloads {
+			if payload.Namespace == ctx.nameSpace {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			allNamespacePayloads = append(allNamespacePayloads, ctx.nsPayload)
+		}
+	}
 
-		if cerr != nil && ENABLE_TRANSLIB_ROLLBACK == "true" {
-			for ns, redisDbInstance := range redisMdbInstances {
-				for _, payload := range namespacePayloads {
-					if payload.Namespace == ns && payload.Commited {
-						log.Infof("Rollback key:%v, Namespace: %s", payload.Key, payload.Namespace)
-						err = (*app).rollback(redisDbInstance)
-						if err != nil {
-							log.Infof("Rollback operation failed!")
+	cerr := commitTransactions(redisMdbInstances, allNamespacePayloads)
+
+	if cerr != nil && ENABLE_TRANSLIB_ROLLBACK == "true" {
+		for ns, redisDbInstance := range redisMdbInstances {
+			for _, payload := range allNamespacePayloads {
+				if payload.Namespace == ns && payload.Commited {
+					log.Infof("Rollback key:%v, Namespace: %s", payload.Key, payload.Namespace)
+					for _, ctx := range writeContexts {
+						if ctx.nameSpace == ns {
+							err = (*ctx.app).rollback(redisDbInstance)
+							break
 						}
 					}
+					if err != nil {
+						log.Infof("Rollback operation failed!")
+					}
+					break
 				}
 			}
 		}

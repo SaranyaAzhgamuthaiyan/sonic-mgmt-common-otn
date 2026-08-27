@@ -1795,7 +1795,9 @@ func (app *CommonApp) cmnAppCRUDTakeBackup(d *db.DB, ckey string, opcode int, db
 	var xfmrTblLst []string
 	var resultTblLst []string
 
-	d.Opts.DisableCVLCheck = true
+	// DisableCVLCheck is set by the translib caller (Create/Update/Replace/Delete/Bulk)
+	// while writeMutex is already held. Do not toggle it here: sync.Mutex is not
+	// reentrant, and Coverity cannot see the lock through the appInterface call.
 
 	// Step 1: Sort tables by dependency
 	for tblNm := range dbMap {
