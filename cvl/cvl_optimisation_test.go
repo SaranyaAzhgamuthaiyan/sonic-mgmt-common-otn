@@ -32,8 +32,7 @@ func extraChecksHelper(t *testing.T, dbData map[string]interface{}, data []CVLEd
 	if dbData != nil {
 		setupTestData(t, dbData)
 	}
-	d := getMDBInstance(hostDBName)
-	c := NewTestSession(t, d)
+	c := NewTestSession(t)
 	c.StoreHint(hintKey, false)
 	res, _ := c.ValidateEditConfig(data)
 	verifyErr(t, res, Success)

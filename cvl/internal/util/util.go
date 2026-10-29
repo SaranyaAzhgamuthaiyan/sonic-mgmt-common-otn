@@ -61,7 +61,6 @@ static void ly_set_log_callback(int enable) {
 */
 import "C"
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -76,9 +75,10 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/Azure/sonic-mgmt-common/internal/mdb"
 	set "github.com/Workiva/go-datastructures/set"
+	"github.com/go-redis/redis/v7"
 	log "github.com/golang/glog"
-	"github.com/redis/go-redis/v9"
 )
 
 var CVL_SCHEMA string = "schema/"
@@ -88,7 +88,7 @@ const CVL_LOG_FILE = "/tmp/cvl.log"
 const SONIC_DB_CONFIG_FILE string = "/var/run/redis/sonic-db/database_config.json"
 const ENV_VAR_SONIC_DB_CONFIG_FILE = "DB_CONFIG_PATH"
 
-var DEFAULT_ASIC_CONF_FILE_PATH = "/usr/share/sonic/platform/asic.conf"
+var DEFAULT_ASIC_CONF_FILE_PATH = mdb.DefaultAsicConfPath
 var DEFAULT_GLOBALDB_FILE_PATH = "/var/run/redis/sonic-db/database_global.json"
 var NumAsic = 1
 var multiDbsConfigMap = make(map[string]map[string]interface{})
@@ -246,43 +246,11 @@ var Tracing bool = false
 var traceFlags uint16 = 0
 
 func IsMultiAsic() bool {
-	return NumAsic > 0
+	return mdb.IsMultiAsic(NumAsic)
 }
 
 func getNumAsic() int {
-	file, err := os.Open(DEFAULT_ASIC_CONF_FILE_PATH)
-	if err != nil {
-		log.Warning("Cannot find the asic.conf file, set num_asic to 1 by default")
-		return 1
-	}
-
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	scanner.Split(bufio.ScanLines)
-	var text []string
-	for scanner.Scan() {
-		text = append(text, scanner.Text())
-	}
-
-	var numAsics = 1
-	for _, line := range text {
-		tokens := strings.Split(line, "=")
-		if len(tokens) != 2 {
-			continue
-		}
-
-		if strings.ToLower(tokens[0]) == "num_asic" {
-			num, err := strconv.Atoi(tokens[1])
-			if err != nil {
-				log.Warning("invalid line in asic.config")
-				continue
-			}
-			numAsics = num
-		}
-	}
-
-	return numAsics
+	return mdb.ReadNumAsic(DEFAULT_ASIC_CONF_FILE_PATH)
 }
 
 func SetTrace(on bool) {

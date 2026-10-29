@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/Azure/sonic-mgmt-common/cvl"
-	"github.com/redis/go-redis/v9"
+	"github.com/go-redis/redis/v7"
 	"github.com/pkg/profile"
 )
 
@@ -38,7 +38,7 @@ func getConfigDbClient() *redis.Client {
 		DB:          4,
 		DialTimeout: 0,
 	})
-	_, err := rclient.Ping(context.Background()).Result()
+	_, err := rclient.Ping().Result()
 	if err != nil {
 		fmt.Printf("failed to connect to redis server %v", err)
 	}
@@ -47,7 +47,7 @@ func getConfigDbClient() *redis.Client {
 
 /* Unloads the Config DB based on JSON File. */
 func unloadConfigDB(rclient *redis.Client, key string, data map[string]string) {
-	_, err := rclient.Del(context.Background(), key).Result()
+	_, err := rclient.Del(key).Result()
 
 	if err != nil {
 		fmt.Printf("Failed to delete for key %s, data %v, err %v", key, data, err)
@@ -64,7 +64,7 @@ func loadConfigDB(rclient *redis.Client, key string, data map[string]string) {
 		dataTmp[k] = v
 	}
 
-	_, err := rclient.HSet(context.Background(), key, dataTmp).Result()
+	_, err := rclient.HSet(key, dataTmp).Result()
 
 	if err != nil {
 		fmt.Printf("Failed to add for key %s, data %v, err %v", key, data, err)

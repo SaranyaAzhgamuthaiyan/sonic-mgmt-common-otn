@@ -33,9 +33,9 @@ import (
 	custv "github.com/Azure/sonic-mgmt-common/cvl/custom_validation"
 	"github.com/Azure/sonic-mgmt-common/cvl/internal/yparser"
 	"github.com/antchfx/xmlquery"
+	"github.com/go-redis/redis/v7"
 	"github.com/google/go-cmp/cmp"
 	"github.com/philopon/go-toposort"
-	"github.com/redis/go-redis/v9"
 
 	//lint:ignore ST1001 This is safe to dot import for util package
 	. "github.com/Azure/sonic-mgmt-common/cvl/internal/util"
