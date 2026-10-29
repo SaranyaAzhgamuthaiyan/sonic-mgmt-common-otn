@@ -29,7 +29,6 @@ import (
 
 	// "github.com/Azure/sonic-mgmt-common/translib/tlerr"
 	// "os/exec"
-	"context"
 	"os"
 
 	// "reflect"
@@ -39,7 +38,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/go-redis/redis/v7"
 )
 
 func killRedisScripts(dbName string) {
@@ -48,7 +47,7 @@ func killRedisScripts(dbName string) {
 		return
 	}
 	defer CloseRedisClient(client)
-	client.ScriptKill(context.Background())
+	client.ScriptKill()
 }
 
 func TestDefaultTimeout(t *testing.T) {
@@ -154,7 +153,7 @@ end
 return i
 `)
 
-	if _, e := luaScript.Run(context.Background(), d.client, []string{}, secs).Int(); e != nil {
+	if _, e := luaScript.Run(d.client, []string{}, secs).Int(); e != nil {
 		t.Logf("blockLUAScript: luaScript.Run() fails e = %v", e)
 	}
 

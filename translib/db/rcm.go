@@ -1,14 +1,13 @@
 package db
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"sync"
 	"sync/atomic"
 
+	"github.com/go-redis/redis/v7"
 	log "github.com/golang/glog"
-	"github.com/redis/go-redis/v9"
 )
 
 var usePools = flag.Bool("use_connection_pools", false, "use connection pools for Redis Clients")
@@ -69,7 +68,7 @@ func createRedisClient(db DBNum, poolSize int) *redis.Client {
 	opts := adjustRedisOpts(&Options{DBNo: db})
 	opts.PoolSize = poolSize
 	client := redis.NewClient(opts)
-	if _, err := client.Ping(context.Background()).Result(); err != nil {
+	if _, err := client.Ping().Result(); err != nil {
 		log.V(0).Infof("RCM error during Redis Client creation for DBNum=%v: %v", db, err)
 	}
 	return client
@@ -77,7 +76,7 @@ func createRedisClient(db DBNum, poolSize int) *redis.Client {
 
 func createRedisClientWithOpts(opts *redis.Options) *redis.Client {
 	client := redis.NewClient(opts)
-	if _, err := client.Ping(context.Background()).Result(); err != nil {
+	if _, err := client.Ping().Result(); err != nil {
 		log.V(0).Infof("RCM error during Redis Client creation for DBNum=%v: %v", opts.DB, err)
 	}
 	return client

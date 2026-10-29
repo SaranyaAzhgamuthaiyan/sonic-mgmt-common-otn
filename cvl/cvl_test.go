@@ -20,7 +20,6 @@
 package cvl_test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -35,7 +34,7 @@ import (
 	cmn "github.com/Azure/sonic-mgmt-common/cvl/common"
 	"github.com/Azure/sonic-mgmt-common/translib/db"
 	"github.com/Azure/sonic-mgmt-common/translib/tlerr"
-	"github.com/redis/go-redis/v9"
+	"github.com/go-redis/redis/v7"
 
 	//"syscall"
 
@@ -193,7 +192,7 @@ func unloadConfigDB(rclient *redis.Client, mpi map[string]interface{}) {
 		case map[string]interface{}:
 			for subKey, subValue := range fv.(map[string]interface{}) {
 				newKey := key + getSeparator() + subKey
-				_, err := rclient.Del(context.Background(), newKey).Result()
+				_, err := rclient.Del(newKey).Result()
 
 				if err != nil {
 					fmt.Printf("Invalid data for db: %v : %v %v", newKey, subValue, err)
@@ -214,7 +213,7 @@ func loadConfigDB(rclient *redis.Client, mpi map[string]interface{}) {
 		case map[string]interface{}:
 			for subKey, subValue := range fv.(map[string]interface{}) {
 				newKey := key + getSeparator() + subKey
-				_, err := rclient.HSet(context.Background(), newKey, subValue.(map[string]interface{})).Result()
+				_, err := rclient.HSet(newKey, subValue.(map[string]interface{})).Result()
 
 				if err != nil {
 					fmt.Printf("Invalid data for db: %v : %v %v", newKey, subValue, err)
@@ -248,7 +247,7 @@ func prepareDb() {
 	}
 
 	//Load device data map on which application of deviation files depends
-	dm, err := rclient.Keys(context.Background(), "DEVICE_METADATA|localhost").Result()
+	dm, err := rclient.Keys("DEVICE_METADATA|localhost").Result()
 	if (err != nil) || (len(dm) == 0) {
 		loadConfigDB(rclient, deviceDataMap)
 		loadDeviceDataMap = true
@@ -256,7 +255,7 @@ func prepareDb() {
 
 	port_map = loadConfig("", PortsMapByte)
 
-	portKeys, err := rclient.Keys(context.Background(), "PORT|*").Result()
+	portKeys, err := rclient.Keys("PORT|*").Result()
 	//Load only the port config which are not there in Redis
 	if err == nil {
 		portMapKeys := port_map["PORT"].(map[string]interface{})
@@ -364,7 +363,7 @@ func TestMain(m *testing.M) {
 
 	cvl.Finish()
 	rclient.Close()
-	rclient.FlushDB(context.Background())
+	rclient.FlushDB()
 
 	if redisAlreadyRunning == false {
 		//If Redis was not already running, close the instance that we ran
@@ -383,15 +382,14 @@ var configDb map[string]*db.DB
 
 const hostDBName string = "host"
 
-var MdbNames []string = []string{"host"}
+var MdbNames []string
 
 func init() {
 	var err error
 	configDb = make(map[string]*db.DB)
 
-	if NumAsic == 1 {
-		MdbNames = append(MdbNames, "host")
-	} else {
+	MdbNames = []string{hostDBName}
+	if NumAsic > 1 {
 		for i := 0; i < NumAsic; i++ {
 			MdbNames = append(MdbNames, "asic"+strconv.Itoa(i))
 		}
@@ -447,7 +445,13 @@ func NewCvlSession(d *db.DB) (cvlSess *cvl.CVL, retCode cvl.CVLRetCode) {
 	return
 }
 
-func NewTestSession(t *testing.T, d *db.DB) *cvl.CVL {
+// NewTestSession opens a CVL validation session on the host CONFIG_DB namespace.
+func NewTestSession(t *testing.T) *cvl.CVL {
+	return NewTestSessionForDB(t, getMDBInstance(hostDBName))
+}
+
+// NewTestSessionForDB opens a CVL validation session on an explicit multi-DB namespace.
+func NewTestSessionForDB(t *testing.T, d *db.DB) *cvl.CVL {
 	c, _ := d.NewValidationSession()
 	t.Cleanup(func() { cvl.ValidationSessClose(c) })
 	return c
@@ -3286,8 +3290,7 @@ func TestValidateEditConfig_Use_Updated_Data_As_Create_DependentData_Positive(t 
 		},
 	})
 
-	d := getMDBInstance(hostDBName)
-	cvSess := NewTestSession(t, d)
+	cvSess := NewTestSession(t)
 
 	cfgData := []cmn.CVLEditConfigData{
 		cmn.CVLEditConfigData{
@@ -3700,49 +3703,46 @@ func TestGetDepDataForDelete(t *testing.T) {
 }
 
 func TestMaxElements_All_Entries_In_Request(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess := NewTestSession(t, d)
+	cvSess := NewTestSession(t)
 
-		cfgData := []cmn.CVLEditConfigData{
-			cmn.CVLEditConfigData{
-				cmn.VALIDATE_ALL,
-				cmn.OP_CREATE,
-				"VXLAN_TUNNEL|tun1",
-				map[string]string{
-					"src_ip": "20.1.1.1",
-				},
-				false,
+	cfgData := []cmn.CVLEditConfigData{
+		cmn.CVLEditConfigData{
+			cmn.VALIDATE_ALL,
+			cmn.OP_CREATE,
+			"VXLAN_TUNNEL|tun1",
+			map[string]string{
+				"src_ip": "20.1.1.1",
 			},
-		}
-
-		//Check addition of first element
-		cvlErrInfo, _ := cvSess.ValidateEditConfig(cfgData)
-		verifyErr(t, cvlErrInfo, Success)
-
-		cfgData1 := []cmn.CVLEditConfigData{
-			cmn.CVLEditConfigData{
-				cmn.VALIDATE_ALL,
-				cmn.OP_CREATE,
-				"VXLAN_TUNNEL|tun2",
-				map[string]string{
-					"src_ip": "30.1.1.1",
-				},
-				false,
-			},
-		}
-
-		//Try to validate addition of second element
-		cvlErrInfo, _ = cvSess.ValidateEditConfig(cfgData1)
-		verifyErr(t, cvlErrInfo, CVLErrorInfo{
-			ErrCode:          CVL_SYNTAX_ERROR,
-			TableName:        "VXLAN_TUNNEL",
-			Keys:             []string{"tun2"},
-			Msg:              "Max elements limit reached",
-			ConstraintErrMsg: "Max elements limit 1 reached",
-			ErrAppTag:        "too-many-elements",
-		})
+			false,
+		},
 	}
+
+	//Check addition of first element
+	cvlErrInfo, _ := cvSess.ValidateEditConfig(cfgData)
+	verifyErr(t, cvlErrInfo, Success)
+
+	cfgData1 := []cmn.CVLEditConfigData{
+		cmn.CVLEditConfigData{
+			cmn.VALIDATE_ALL,
+			cmn.OP_CREATE,
+			"VXLAN_TUNNEL|tun2",
+			map[string]string{
+				"src_ip": "30.1.1.1",
+			},
+			false,
+		},
+	}
+
+	//Try to validate addition of second element
+	cvlErrInfo, _ = cvSess.ValidateEditConfig(cfgData1)
+	verifyErr(t, cvlErrInfo, CVLErrorInfo{
+		ErrCode:          CVL_SYNTAX_ERROR,
+		TableName:        "VXLAN_TUNNEL",
+		Keys:             []string{"tun2"},
+		Msg:              "Max elements limit reached",
+		ConstraintErrMsg: "Max elements limit 1 reached",
+		ErrAppTag:        "too-many-elements",
+	})
 }
 
 func TestMaxElements_Entries_In_Redis(t *testing.T) {
@@ -3776,8 +3776,7 @@ func TestMaxElements_Entries_In_Redis(t *testing.T) {
 	})
 
 	t.Run("delete_and_create", func(tt *testing.T) {
-		d := getMDBInstance(hostDBName)
-		cvSess := NewTestSession(tt, d)
+		cvSess := NewTestSession(tt)
 
 		cfgData1 := []CVLEditConfigData{{
 			cmn.VALIDATE_ALL,
@@ -3818,56 +3817,53 @@ func TestMaxElements_Entries_In_Redis(t *testing.T) {
 }
 
 func TestValidateEditConfig_Two_Create_Requests_Positive(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess := NewTestSession(t, d)
+	cvSess := NewTestSession(t)
 
-		cfgDataVlan := []cmn.CVLEditConfigData{
-			cmn.CVLEditConfigData{
-				cmn.VALIDATE_ALL,
-				cmn.OP_CREATE,
-				"VLAN|Vlan21",
-				map[string]string{
-					"vlanid": "21",
-				},
-				false,
+	cfgDataVlan := []cmn.CVLEditConfigData{
+		cmn.CVLEditConfigData{
+			cmn.VALIDATE_ALL,
+			cmn.OP_CREATE,
+			"VLAN|Vlan21",
+			map[string]string{
+				"vlanid": "21",
 			},
-		}
-
-		cvlErrInfo, _ := cvSess.ValidateEditConfig(cfgDataVlan)
-		if !verifyErr(t, cvlErrInfo, Success) {
-			return
-		}
-
-		cfgDataVlan = []cmn.CVLEditConfigData{
-			cmn.CVLEditConfigData{
-				cmn.VALIDATE_NONE,
-				cmn.OP_CREATE,
-				"VLAN|Vlan21",
-				map[string]string{
-					"vlanid": "21",
-				},
-				false,
-			},
-			cmn.CVLEditConfigData{
-				cmn.VALIDATE_ALL,
-				cmn.OP_CREATE,
-				"STP_VLAN|Vlan21",
-				map[string]string{
-					"enabled":       "true",
-					"forward_delay": "15",
-					"hello_time":    "2",
-					"max_age":       "20",
-					"priority":      "327",
-					"vlanid":        "21",
-				},
-				false,
-			},
-		}
-
-		cvlErrInfo, _ = cvSess.ValidateEditConfig(cfgDataVlan)
-		verifyErr(t, cvlErrInfo, Success)
+			false,
+		},
 	}
+
+	cvlErrInfo, _ := cvSess.ValidateEditConfig(cfgDataVlan)
+	if !verifyErr(t, cvlErrInfo, Success) {
+		return
+	}
+
+	cfgDataVlan = []cmn.CVLEditConfigData{
+		cmn.CVLEditConfigData{
+			cmn.VALIDATE_NONE,
+			cmn.OP_CREATE,
+			"VLAN|Vlan21",
+			map[string]string{
+				"vlanid": "21",
+			},
+			false,
+		},
+		cmn.CVLEditConfigData{
+			cmn.VALIDATE_ALL,
+			cmn.OP_CREATE,
+			"STP_VLAN|Vlan21",
+			map[string]string{
+				"enabled":       "true",
+				"forward_delay": "15",
+				"hello_time":    "2",
+				"max_age":       "20",
+				"priority":      "327",
+				"vlanid":        "21",
+			},
+			false,
+		},
+	}
+
+	cvlErrInfo, _ = cvSess.ValidateEditConfig(cfgDataVlan)
+	verifyErr(t, cvlErrInfo, Success)
 }
 
 func TestValidateEditConfig_Two_Delete_Requests_Positive(t *testing.T) {
@@ -3889,8 +3885,7 @@ func TestValidateEditConfig_Two_Delete_Requests_Positive(t *testing.T) {
 		},
 	})
 
-	d := getMDBInstance(hostDBName)
-	cvSess := NewTestSession(t, d)
+	cvSess := NewTestSession(t)
 
 	cfgDataVlan := []cmn.CVLEditConfigData{
 		cmn.CVLEditConfigData{
@@ -3955,8 +3950,7 @@ func TestValidateEditConfig_Multi_Delete_MultiKey_Same_Session_Positive(t *testi
 			},
 		},
 	})
-	d := getMDBInstance(hostDBName)
-	cvSess := NewTestSession(t, d)
+	cvSess := NewTestSession(t)
 
 	cfgData := []cmn.CVLEditConfigData{
 		cmn.CVLEditConfigData{

@@ -20,11 +20,9 @@
 package db
 
 import (
-	"context"
-
+	"github.com/go-redis/redis/v7"
 	"github.com/golang/glog"
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/redis/go-redis/v9"
 )
 
 type GetConfigOptions struct {
@@ -133,7 +131,7 @@ func (d *DB) GetConfig(tables []*TableSpec, opt *GetConfigOptions) (map[TableSpe
 		pipe := d.client.Pipeline()
 
 		tss := make([]*TableSpec, 0, len(redisKeys))
-		presults := make([]*redis.MapStringStringCmd, 0, len(redisKeys))
+		presults := make([]*redis.StringStringMapCmd, 0, len(redisKeys))
 		keys := make([]Key, 0, len(redisKeys))
 
 		for index, redisKey := range redisKeys {
@@ -159,7 +157,7 @@ func (d *DB) GetConfig(tables []*TableSpec, opt *GetConfigOptions) (map[TableSpe
 
 			tss = append(tss, &rKts)
 			keys = append(keys, key)
-			presults = append(presults, pipe.HGetAll(context.Background(), redisKey))
+			presults = append(presults, pipe.HGetAll(redisKey))
 		}
 
 		if glog.V(3) {
@@ -171,7 +169,7 @@ func (d *DB) GetConfig(tables []*TableSpec, opt *GetConfigOptions) (map[TableSpe
 		if glog.V(3) {
 			glog.Info("GetConfig: RedisCmd: ", d.Name(), ": ", "pipe.Exec")
 		}
-		_, err = pipe.Exec(context.Background()) // Ignore returned Cmds. If any err, log it.
+		_, err = pipe.Exec() // Ignore returned Cmds. If any err, log it.
 
 		if err != nil {
 			glog.Error("GetConfig: pipe.Exec() err: ", err)

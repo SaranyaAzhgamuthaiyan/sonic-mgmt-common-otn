@@ -154,8 +154,7 @@ func TestValidateEditConfig_Not_equal_in_predicate_postive(t *testing.T) {
 
 	// Create of another entry with unused port
 	t.Run("create_entry_unused_port", func(tt *testing.T) {
-		d := getMDBInstance(hostDBName)
-		c := NewTestSession(tt, d)
+		c := NewTestSession(tt)
 		res, _ := c.ValidateEditConfig([]CVLEditConfigData{{
 			VType: VALIDATE_ALL,
 			VOp:   OP_CREATE,
@@ -168,8 +167,7 @@ func TestValidateEditConfig_Not_equal_in_predicate_postive(t *testing.T) {
 
 	// Update of ifname to an unused port
 	t.Run("update_ifname_unused_port", func(tt *testing.T) {
-		d := getMDBInstance(hostDBName)
-		c := NewTestSession(tt, d)
+		c := NewTestSession(tt)
 		res, _ := c.ValidateEditConfig([]CVLEditConfigData{{
 			VType: VALIDATE_ALL,
 			VOp:   OP_UPDATE,
@@ -182,8 +180,7 @@ func TestValidateEditConfig_Not_equal_in_predicate_postive(t *testing.T) {
 
 	// Update of some other attribute
 	t.Run("update_other_attr", func(tt *testing.T) {
-		d := getMDBInstance(hostDBName)
-		c := NewTestSession(tt, d)
+		c := NewTestSession(tt)
 		res, _ := c.ValidateEditConfig([]CVLEditConfigData{{
 			VType: VALIDATE_ALL,
 			VOp:   OP_UPDATE,
@@ -195,8 +192,7 @@ func TestValidateEditConfig_Not_equal_in_predicate_postive(t *testing.T) {
 	})
 	// Delete of some other attribute
 	t.Run("delete_other_attr", func(tt *testing.T) {
-		d := getMDBInstance(hostDBName)
-		c := NewTestSession(tt, d)
+		c := NewTestSession(tt)
 		res, _ := c.ValidateEditConfig([]CVLEditConfigData{{
 			VType: VALIDATE_ALL,
 			VOp:   OP_DELETE,
@@ -222,8 +218,7 @@ func TestValidateEditConfig_Not_equal_in_predicate_negative(t *testing.T) {
 		}})
 	// Create of entry with already existing ifname
 	t.Run("create_entry_already_existing_port", func(tt *testing.T) {
-		d := getMDBInstance(hostDBName)
-		c := NewTestSession(tt, d)
+		c := NewTestSession(tt)
 		res, _ := c.ValidateEditConfig([]CVLEditConfigData{{
 			VType: VALIDATE_ALL,
 			VOp:   OP_CREATE,
@@ -241,8 +236,7 @@ func TestValidateEditConfig_Not_equal_in_predicate_negative(t *testing.T) {
 
 	// Update of ifname to already used port name
 	t.Run("update_ifname_already_existing_port", func(tt *testing.T) {
-		d := getMDBInstance(hostDBName)
-		c := NewTestSession(tt, d)
+		c := NewTestSession(tt)
 		res, _ := c.ValidateEditConfig([]CVLEditConfigData{{
 			VType: VALIDATE_ALL,
 			VOp:   OP_UPDATE,

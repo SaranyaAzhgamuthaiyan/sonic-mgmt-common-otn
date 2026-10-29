@@ -20,7 +20,7 @@
 package util
 
 import (
-	"github.com/redis/go-redis/v9"
+	"github.com/go-redis/redis/v7"
 )
 
 var FILTER_ENTRIES_LUASCRIPT *redis.Script = redis.NewScript(`
