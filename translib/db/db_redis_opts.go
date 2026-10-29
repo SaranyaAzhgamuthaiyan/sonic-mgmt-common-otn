@@ -28,8 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-redis/redis/v7"
 	"github.com/golang/glog"
-	"github.com/redis/go-redis/v9"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -273,7 +273,7 @@ func (config *_DBRedisOptsConfig) parseRedisOptsConfig(optsString string) error 
 					config.opts.MinIdleConns = int(intVal)
 				}
 			case "MaxConnAge", "ConnMaxLifetime":
-				if config.opts.ConnMaxLifetime, optSAErr =
+				if config.opts.MaxConnAge, optSAErr =
 					time.ParseDuration(optSA[1]); optSAErr != nil {
 					eS += ("Parse Error: " + optSA[0] + " :" + optSAErr.Error())
 				}
@@ -283,7 +283,7 @@ func (config *_DBRedisOptsConfig) parseRedisOptsConfig(optsString string) error 
 					eS += ("Parse Error: " + optSA[0] + " :" + optSAErr.Error())
 				}
 			case "IdleTimeout", "ConnMaxIdleTime":
-				if config.opts.ConnMaxIdleTime, optSAErr =
+				if config.opts.IdleTimeout, optSAErr =
 					time.ParseDuration(optSA[1]); optSAErr != nil {
 					eS += ("Parse Error: " + optSA[0] + " :" + optSAErr.Error())
 				}

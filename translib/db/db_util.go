@@ -1,93 +1,44 @@
 package db
 
 import (
-	"bufio"
+	"github.com/Azure/sonic-mgmt-common/internal/mdb"
 	"github.com/golang/glog"
-	"os"
-	"strconv"
-	"strings"
 )
 
 const (
-	DEFAULT_KEY_SEPERATOR = "-"
+	DEFAULT_KEY_SEPERATOR = mdb.DefaultKeySeparator
 )
 
 func isMultiAsic() bool {
-	return NumAsic > 0
+	return mdb.IsMultiAsic(NumAsic)
 }
 
 func getNumAsic() int {
-	file, err := os.Open(DefaultAsicConfFilePath)
-	if err != nil {
-		glog.Warning("Cannot find the asic.conf file, set num_asic to 1 by default")
-		return 1
-	}
-
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	scanner.Split(bufio.ScanLines)
-	var text []string
-	for scanner.Scan() {
-		text = append(text, scanner.Text())
-	}
-
-	var numAsics = 1
-	for _, line := range text {
-		tokens := strings.Split(line, "=")
-		if len(tokens) != 2 {
-			continue
-		}
-
-		if strings.ToLower(tokens[0]) == "num_asic" {
-			num, err := strconv.Atoi(tokens[1])
-			if err != nil {
-				glog.Warning("invalid line in asic.config")
-				continue
-			}
-			numAsics = num
-		}
-	}
-
-	return numAsics
+	return mdb.ReadNumAsic(DefaultAsicConfFilePath)
 }
 
-// Function to fetch dbName from dbConfigMap
 func fetchDbNameFromGlobalJson() string {
-	var dbName string
+	keys := make([]string, 0, len(multiDbsConfigMap))
 	for key := range multiDbsConfigMap {
-		if key != "host" {
-			dbName = key[:len(key)-1]
-			break
-		}
+		keys = append(keys, key)
 	}
-	return dbName
+	return mdb.AsicPrefixFromMapKeys(keys)
+}
+
+func mdbSettings() mdb.Settings {
+	return mdb.Settings{
+		NumAsic:      NumAsic,
+		KeySeparator: GlobalKeySeperator,
+		AsicPrefix:   fetchDbNameFromGlobalJson(),
+	}
 }
 
 func GetMultiDbNames() []string {
-	// Case 1: NumAsic is 1 → return host only
-	if NumAsic == 1 {
-		return []string{"host"}
-	}
-
-	// Case 2: NumAsic > 1 → return asic DBs only
-	dbNames := []string{"host"}
-	cmnDbName := fetchDbNameFromGlobalJson()
-
-	for num := 0; num < NumAsic; num++ {
-		dbNames = append(dbNames, cmnDbName+strconv.Itoa(num))
-	}
-
-	return dbNames
+	return mdb.MultiDBNames(mdbSettings())
 }
 
 func getDbNameBySlotNum(slotNum int) string {
-	if NumAsic == 1 || slotNum > NumAsic || slotNum < 1 {
-		return "host"
-	}
-	cmnDbName := fetchDbNameFromGlobalJson()
-
-	return cmnDbName + strconv.Itoa(slotNum-1)
+	return mdb.DBNameBySlot(mdbSettings(), slotNum)
 }
 
 func GetKeySeperatorFromGlobalJson() string {
@@ -99,40 +50,13 @@ func GetKeySeperatorFromGlobalJson() string {
 }
 
 func GetMDBNameFromEntity(entity interface{}) string {
-	var slotNum int
-	var slotNumStr string
+	s := mdbSettings()
+	s.KeySeparator = GetKeySeperatorFromGlobalJson()
+	return mdb.NamespaceFromEntity(s, entity)
+}
 
-	keySeperator := GetKeySeperatorFromGlobalJson()
-
-	switch t := entity.(type) {
-	case uint16:
-		valUint16, _ := entity.(uint16)
-		slotNum = int(valUint16 / 100)
-	case uint32:
-		// ch115
-		valUint32, _ := entity.(uint32)
-		slotNum = int(valUint32 / 100)
-	case string:
-		valString, _ := entity.(string)
-		elmts := strings.Split(valString, keySeperator)
-		if len(elmts) == 2 && elmts[0] == "SLOT" {
-			// used for reboot entity-name
-			slotNumStr = elmts[1]
-		} else if len(elmts) >= 3 {
-			slotNumStr = elmts[2]
-		} else {
-			goto error
-		}
-
-		tmp, err := strconv.ParseInt(slotNumStr, 10, 64)
-		if err != nil {
-			goto error
-		}
-		slotNum = int(tmp)
-	default:
-		glog.Errorf("unexpected type %T", t)
-	}
-
-error:
-	return getDbNameBySlotNum(slotNum)
+func GetMDBNameFromOtnOpticalEntity(entity interface{}) string {
+	s := mdbSettings()
+	s.KeySeparator = GetKeySeperatorFromGlobalJson()
+	return mdb.NamespaceFromOtnOpticalEntity(s, entity)
 }

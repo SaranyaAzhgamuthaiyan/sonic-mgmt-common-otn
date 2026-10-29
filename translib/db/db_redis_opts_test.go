@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/go-redis/redis/v7"
 )
 
 func TestSetGoRedisOpts(t *testing.T) {

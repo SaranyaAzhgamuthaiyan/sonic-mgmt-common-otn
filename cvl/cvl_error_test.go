@@ -88,8 +88,7 @@ const (
 )
 
 func verifyValidateEditConfig(t *testing.T, data []CVLEditConfigData, exp CVLErrorInfo) {
-	d := getMDBInstance(hostDBName)
-	c := NewTestSession(t, d)
+	c := NewTestSession(t)
 	res, _ := c.ValidateEditConfig(data)
 	verifyErr(t, res, exp)
 }

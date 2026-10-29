@@ -20,10 +20,9 @@
 package cvl
 
 import (
-	"context"
 	"errors"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/go-redis/redis/v7"
 	//lint:ignore ST1001 This is safe to dot import for util package
 )
 
@@ -35,7 +34,7 @@ func RunLua(redisClient *redis.Client, name string, args ...interface{}) (interf
 	if !ok || script == nil {
 		return nil, errors.New("unknown script: " + name)
 	}
-	return script.Run(context.Background(), redisClient, []string{}, args...).Result()
+	return script.Run(redisClient, []string{}, args...).Result()
 }
 
 // Redis server side script
