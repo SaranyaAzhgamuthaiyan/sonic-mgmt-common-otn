@@ -68,7 +68,6 @@ import (
 	fileLog "log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -92,17 +91,6 @@ var DEFAULT_ASIC_CONF_FILE_PATH = mdb.DefaultAsicConfPath
 var DEFAULT_GLOBALDB_FILE_PATH = "/var/run/redis/sonic-db/database_global.json"
 var NumAsic = 1
 var multiDbsConfigMap = make(map[string]map[string]interface{})
-
-type DbGlobal struct {
-	Includes     []DbInclude `json:"INCLUDES"`
-	Version      string      `json:"VERSION"`
-	KeySeperator string      `json:"KEY_SEPERATOR"`
-}
-
-type DbInclude struct {
-	Include   string `json:"include"`
-	Namespace string `json:"namespace"`
-}
 
 var sonic_db_config = make(map[string]interface{})
 
@@ -138,44 +126,17 @@ func init() {
 	}
 
 	NumAsic = getNumAsic()
-	if !IsMultiAsic() {
-		dbCfgInit(SONIC_DB_CONFIG_FILE, "host")
-	} else {
-		globalDbInfo := loadGlobalDatabase(DEFAULT_GLOBALDB_FILE_PATH)
-		for namespace, path := range globalDbInfo {
-			dbCfgInit(path, namespace)
-		}
+	paths, _, err := mdb.ConfigPathsForInit(NumAsic, SONIC_DB_CONFIG_FILE, DEFAULT_GLOBALDB_FILE_PATH)
+	if err != nil {
+		panic(err)
+	}
+	for namespace, path := range paths {
+		dbCfgInit(path, namespace)
 	}
 
 	redisOptions = &redis.Options{}
 
 	formatterFunctionsMap = make(map[string]Formatter)
-}
-
-func loadGlobalDatabase(globalDbFilePath string) map[string]string {
-	var globalDbCfg DbGlobal
-
-	data, err := os.ReadFile(globalDbFilePath)
-	if err != nil {
-		panic(err)
-	} else {
-		err = json.Unmarshal([]byte(data), &globalDbCfg)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	var dbConfigMap = make(map[string]string)
-	var pwd = filepath.Dir(globalDbFilePath) + "/"
-	for i := 0; i < len(globalDbCfg.Includes); i++ {
-		if i == 0 {
-			dbConfigMap["host"] = pwd + globalDbCfg.Includes[0].Include
-		} else {
-			include := globalDbCfg.Includes[i]
-			dbConfigMap[include.Namespace] = pwd + include.Include
-		}
-	}
-	return dbConfigMap
 }
 
 var cvlCfgMap map[string]string

@@ -141,40 +141,28 @@ func TestGetFunctions(t *testing.T) {
 				Dbsock := getDbSock(requiredDB)
 				switch dbName {
 				case "host":
-					t.Run("HostConnection", func(t *testing.T) {
-						//Redis</var/run/redis0/redis.sock db:4>
-						if Dbsock != "/var/run/redis/redis.sock" {
-							t.Error("GetDbSock fails in host connection")
-						}
-					})
+					if Dbsock != "/var/run/redis/redis.sock" {
+						t.Error("GetDbSock fails in host connection")
+					}
 				case "asic0":
-					t.Run("Asic0Connection", func(t *testing.T) {
-						if Dbsock != "/var/run/redis0/redis.sock" {
-							t.Error("GetDbSock fails in asic0 connection")
-						}
-					})
+					if Dbsock != "/var/run/redis0/redis.sock" {
+						t.Error("GetDbSock fails in asic0 connection")
+					}
 				case "asic1":
-					t.Run("Asic1Connection", func(t *testing.T) {
-						if Dbsock != "/var/run/redis1/redis.sock" {
-							t.Error("GetDbSock fails in asic1 connection")
-						}
-					})
+					if Dbsock != "/var/run/redis1/redis.sock" {
+						t.Error("GetDbSock fails in asic1 connection")
+					}
 				case "asic2":
-					t.Run("Asic2Connection", func(t *testing.T) {
-						if Dbsock != "/var/run/redis2/redis.sock" {
-							t.Error("GetDbSock fails in asic2 connection")
-						}
-					})
+					if Dbsock != "/var/run/redis2/redis.sock" {
+						t.Error("GetDbSock fails in asic2 connection")
+					}
 				case "asic3":
-					t.Run("Asic3Connection", func(t *testing.T) {
-						if Dbsock != "/var/run/redis3/redis.sock" {
-							t.Error("GetDbSock fails in asic3 connection")
-						}
-					})
+					if Dbsock != "/var/run/redis3/redis.sock" {
+						t.Error("GetDbSock fails in asic3 connection")
+					}
 				default:
 					t.Errorf("Unexpected database name: %s", dbName)
 				}
-
 			})
 		}
 	}

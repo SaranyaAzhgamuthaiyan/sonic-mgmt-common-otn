@@ -526,8 +526,6 @@ func (app *yanglibApp) getNamespace(path string) ([]NamespacePayload, error) {
 		Key:       "",
 	})
 
-	glog.Infof("yanglibApp:getNamespace: nameSpaceList:%v ", nameSpaceList)
-
 	return nameSpaceList, nil
 }
 

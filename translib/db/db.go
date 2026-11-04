@@ -102,10 +102,8 @@ Example:
 package db
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 
 	"errors"
@@ -132,17 +130,6 @@ var (
 	GlobalKeySeperator             = ""
 )
 
-type DbGlobal struct {
-	Includes     []DbInclude `json:"INCLUDES"`
-	Version      string      `json:"VERSION"`
-	KeySeperator string      `json:"KEY_SEPERATOR"`
-}
-
-type DbInclude struct {
-	Include   string `json:"include"`
-	Namespace string `json:"namespace"`
-}
-
 func init() {
 	initAllDbs()
 }
@@ -167,41 +154,14 @@ func initAllDbs() {
 
 	NumAsic = getNumAsic()
 
-	if !isMultiAsic() {
-		dbConfigInit(dbConfigPath, "host")
-	} else {
-		globalDbInfo := loadGlobalDatabase(DefaultGlobalDbFilePath)
-		for namespace, path := range globalDbInfo {
-			dbConfigInit(path, namespace)
-		}
-	}
-}
-
-func loadGlobalDatabase(globalDbFilePath string) map[string]string {
-	var globalDbCfg DbGlobal
-
-	data, err := os.ReadFile(globalDbFilePath)
+	paths, keySep, err := mdb.ConfigPathsForInit(NumAsic, dbConfigPath, DefaultGlobalDbFilePath)
 	if err != nil {
 		assert(err)
-	} else {
-		err = json.Unmarshal([]byte(data), &globalDbCfg)
-		if err != nil {
-			assert(err)
-		}
 	}
-
-	var dbConfigMap = make(map[string]string)
-	var pwd = filepath.Dir(globalDbFilePath) + "/"
-	for i := 0; i < len(globalDbCfg.Includes); i++ {
-		if i == 0 {
-			dbConfigMap["host"] = pwd + globalDbCfg.Includes[0].Include
-		} else {
-			include := globalDbCfg.Includes[i]
-			dbConfigMap[include.Namespace] = pwd + include.Include
-		}
+	GlobalKeySeperator = keySep
+	for namespace, path := range paths {
+		dbConfigInit(path, namespace)
 	}
-	GlobalKeySeperator = globalDbCfg.KeySeperator
-	return dbConfigMap
 }
 
 // DBNum type indicates the type of DB (Eg: ConfigDB, ApplDB, ...).
@@ -405,10 +365,8 @@ type DB struct {
 }
 
 func (d *DB) SetValidateOnly(v bool) {
-	glog.Infof("SetValidateOnly: namespace=%s,txValidateOnly=%v", d.Opts.MDBName, v)
 	d.txValidateOnly = v
 	if !v {
-		glog.Infof("SetValidateOnly: clearing txTsEntryMap and txCmds for clean phase 2")
 		d.txCmds = d.txCmds[:0]
 		d.cvlEditConfigData = d.cvlEditConfigData[:0]
 		d.txTsEntryMap = make(map[string]map[string]Value)
@@ -430,7 +388,6 @@ func (d *DB) SetValidateOnly(v bool) {
 }
 
 func (d *DB) SetSkipCVL(v bool) {
-	glog.Infof("SetSkipCVL: namespace=%s, txSkipCVL=%v", d.Opts.MDBName, v)
 	d.txSkipCVL = v
 }
 func (d *DB) GetTxValidateOnly() bool {
@@ -1139,7 +1096,9 @@ func (d *DB) doCVL(ts *TableSpec, cvlOps []cmn.CVLOperation, key Key, vals []Val
 	}
 
 	if d.txSkipCVL {
-		glog.Info("doCVL: txSkipCVL=true, skipping CVL for Phase 2")
+		if glog.V(3) {
+			glog.Info("doCVL: txSkipCVL=true, skipping CVL for Phase 2")
+		}
 		goto doCVLExit
 	}
 	if len(cvlOps) != len(vals) {
@@ -1183,9 +1142,6 @@ func (d *DB) doCVL(ts *TableSpec, cvlOps []cmn.CVLOperation, key Key, vals []Val
 	if glog.V(3) {
 		glog.Info("doCVL: calling ValidateEditConfig: ", d.cvlEditConfigData)
 	}
-
-	glog.Infof("doCVL: CALLING ValidateEditConfig — table=%s key=%v numEditConfigData=%d txValidateOnly=%v",
-		ts.Name, key, len(d.cvlEditConfigData), d.txValidateOnly)
 
 	cei, cvlRetCode = d.cv.ValidateEditConfig(d.cvlEditConfigData)
 
@@ -1374,7 +1330,9 @@ func (d *DB) doWrite(ts *TableSpec, op _txOp, k Key, val interface{}) error {
 		goto doWriteExit
 	}
 	if d.txValidateOnly {
-		glog.Info("doWrite: txValidateOnly=true, skipping Redis write for key: ", key)
+		if glog.V(3) {
+			glog.Info("doWrite: txValidateOnly=true, skipping Redis write for key: ", key)
+		}
 		goto doWriteExit
 	}
 
@@ -1418,8 +1376,10 @@ func (d *DB) setEntry(ts *TableSpec, key Key, value Value, isCreate bool) error 
 	var valueComplement Value = Value{Field: make(map[string]string, len(value.Field))}
 	var valueCurrent Value
 
-	glog.Info("setEntry: Begin: ", d.Name(), ": ts: ", ts, " key: ", key,
-		" value: ", value, " isCreate: ", isCreate)
+	if glog.V(3) {
+		glog.Info("setEntry: Begin: ", d.Name(), ": ts: ", ts, " key: ", key,
+			" value: ", value, " isCreate: ", isCreate)
+	}
 
 	if len(value.Field) == 0 {
 		if ts.NoDelete {
@@ -1448,7 +1408,9 @@ func (d *DB) setEntry(ts *TableSpec, key Key, value Value, isCreate bool) error 
 	}
 
 	if !isCreate && e == nil {
-		glog.Info("setEntry: DoCVL for UPDATE")
+		if glog.V(3) {
+			glog.Info("setEntry: DoCVL for UPDATE")
+		}
 		if len(valueComplement.Field) == 0 {
 			e = d.doCVL(ts, []cmn.CVLOperation{cmn.OP_UPDATE},
 				key, []Value{value})
@@ -1457,7 +1419,9 @@ func (d *DB) setEntry(ts *TableSpec, key Key, value Value, isCreate bool) error 
 				key, []Value{value, valueComplement})
 		}
 	} else {
-		glog.Info("setEntry: DoCVL for CREATE")
+		if glog.V(3) {
+			glog.Info("setEntry: DoCVL for CREATE")
+		}
 		e = d.doCVL(ts, []cmn.CVLOperation{cmn.OP_CREATE}, key, []Value{value})
 	}
 
@@ -1867,7 +1831,9 @@ SkipWatch:
 
 // CommitTx method is used by infra to commit a check-and-set Transaction.
 func (d *DB) commitTx() error {
-	glog.Infof("CommitTx: Begin::%v", d)
+	if glog.V(3) {
+		glog.Info("CommitTx: Begin:")
+	}
 
 	var e error = nil
 	var tsmap map[TableSpec]bool = make(map[TableSpec]bool, len(d.txCmds)) // UpperBound
@@ -1908,12 +1874,10 @@ func (d *DB) commitTx() error {
 		glog.Warning("CommitTx: Do: MULTI e: ", e.Error())
 		goto CommitTxExit
 	}
-	glog.Infof("CommitTx:d.txCmds):%v ", d.txCmds)
 
 	// For each cmd in txCmds
 	//   Invoke it
 	for i := 0; i < len(d.txCmds); i++ {
-		glog.Infof("CommitTx:inside for loop :%v ", i)
 
 		var args []interface{}
 

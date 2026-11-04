@@ -3,6 +3,13 @@ package db
 import "testing"
 
 func TestGetMDBNameFromOtnOpticalEntity(t *testing.T) {
+	savedNumAsic := NumAsic
+	savedMap := multiDbsConfigMap
+	t.Cleanup(func() {
+		NumAsic = savedNumAsic
+		multiDbsConfigMap = savedMap
+	})
+
 	NumAsic = 4
 	multiDbsConfigMap = map[string]map[string]interface{}{
 		"asic0": {},
@@ -27,6 +34,13 @@ func TestGetMDBNameFromOtnOpticalEntity(t *testing.T) {
 }
 
 func TestGetMDBNameFromEntity_noOtnCompact(t *testing.T) {
+	savedNumAsic := NumAsic
+	savedMap := multiDbsConfigMap
+	t.Cleanup(func() {
+		NumAsic = savedNumAsic
+		multiDbsConfigMap = savedMap
+	})
+
 	NumAsic = 4
 	multiDbsConfigMap = map[string]map[string]interface{}{
 		"asic0": {},
