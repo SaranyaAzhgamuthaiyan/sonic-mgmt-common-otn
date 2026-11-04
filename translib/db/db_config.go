@@ -176,3 +176,15 @@ func getDbPassword(dbName string) string {
 func GetMdbConfigMap() map[string]map[string]interface{} {
 	return multiDbsConfigMap
 }
+
+// GetDbConfigMap returns the host namespace database_config.json map.
+// Multi-DB callers should use GetMdbConfigMap().
+func GetDbConfigMap() map[string]interface{} {
+	if cfg, ok := multiDbsConfigMap["host"]; ok {
+		return cfg
+	}
+	for _, cfg := range multiDbsConfigMap {
+		return cfg
+	}
+	return make(map[string]interface{})
+}

@@ -2,7 +2,6 @@ package db
 
 import (
 	"github.com/Azure/sonic-mgmt-common/internal/mdb"
-	"github.com/golang/glog"
 )
 
 const (
@@ -45,7 +44,6 @@ func GetKeySeperatorFromGlobalJson() string {
 	if GlobalKeySeperator == "" {
 		GlobalKeySeperator = DEFAULT_KEY_SEPERATOR
 	}
-	glog.Info("GlobalKeySeperator:", GlobalKeySeperator)
 	return GlobalKeySeperator
 }
 

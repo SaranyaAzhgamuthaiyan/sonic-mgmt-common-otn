@@ -10,7 +10,7 @@ import (
 )
 
 func IsMultiAsic(numAsic int) bool {
-	return numAsic > 0
+	return numAsic > 1
 }
 
 // ReadNumAsic parses num_asic= from the platform asic.conf file.

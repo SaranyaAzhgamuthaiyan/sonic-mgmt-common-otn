@@ -95,8 +95,8 @@ func TestDefaultTimeout(t *testing.T) {
 	if e != nil {
 		t.Logf("GetEntry() got error e = %v", e)
 		s := e.Error()
-		if !(strings.HasPrefix(s, "i/o timeout") ||
-			strings.HasPrefix(s, "BUSY")) {
+		// go-redis prefixes timeout errors (e.g. "read unix @->...: i/o timeout").
+		if !(strings.Contains(s, "i/o timeout") || strings.HasPrefix(s, "BUSY")) {
 			t.Errorf("GetEntry() Expecting timeout, BUSY... e = %v", e)
 		}
 	} else {

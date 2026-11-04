@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/sonic-mgmt-common/internal/mdb"
 	"github.com/go-redis/redis/v7"
 )
 
@@ -1112,12 +1113,8 @@ func TestTransactionCacheWithDBContentSet(t *testing.T) {
 }
 
 func TestNewDB(t *testing.T) {
-	//NewDB create a connection in multiple DBs function test
-	dbname := []string{"host", "asic0", "asic1", "asic2", "asic3"}
-	//dbname := GetMultiDbNames()
-	//mdb := make(map[string]*redis.Client)
 	mdb := make(map[string]string)
-	for _, name := range dbname {
+	for _, name := range GetMultiDbNames() {
 		d, e := NewDB(Options{
 			DBNo:               ConfigDB,
 			MDBName:            name,
@@ -1128,48 +1125,36 @@ func TestNewDB(t *testing.T) {
 		})
 		if d == nil {
 			t.Errorf("NewDB() fails e = %v", e)
+			continue
 		}
 		mdb[name] = ClientToString(d.client)
 		if e = d.DeleteDB(); e != nil {
 			t.Errorf("DeleteDB() fails e = %v", e)
 		}
 	}
-	fmt.Println("TestNewDB executing....", mdb)
-	for dbName, _ := range mdb {
-		fmt.Printf("dbName type dbName = %T mdb[dbName] = %T, value of %s is mdb[dbname] = %v\n", dbName, mdb[dbName], dbname, mdb[dbName])
+	for dbName := range mdb {
 		t.Run("Connection_"+dbName, func(t *testing.T) {
 			switch dbName {
 			case "host":
-				t.Run("HostConnection", func(t *testing.T) {
-					//Redis</var/run/redis0/redis.sock db:4>
-					if mdb[dbName] != "Redis</var/run/redis/redis.sock db:4>" {
-						t.Error("NewDB() fails in host connection")
-					}
-				})
+				if mdb[dbName] != "Redis</var/run/redis/redis.sock db:4>" {
+					t.Error("NewDB() fails in host connection")
+				}
 			case "asic0":
-				t.Run("Asic0Connection", func(t *testing.T) {
-					if mdb[dbName] != "Redis</var/run/redis0/redis.sock db:4>" {
-						t.Error("NewDB() fails in asic0 connection")
-					}
-				})
+				if mdb[dbName] != "Redis</var/run/redis0/redis.sock db:4>" {
+					t.Error("NewDB() fails in asic0 connection")
+				}
 			case "asic1":
-				t.Run("Asic1Connection", func(t *testing.T) {
-					if mdb[dbName] != "Redis</var/run/redis1/redis.sock db:4>" {
-						t.Error("NewDB() fails in asic1 connection")
-					}
-				})
+				if mdb[dbName] != "Redis</var/run/redis1/redis.sock db:4>" {
+					t.Error("NewDB() fails in asic1 connection")
+				}
 			case "asic2":
-				t.Run("Asic2Connection", func(t *testing.T) {
-					if mdb[dbName] != "Redis</var/run/redis2/redis.sock db:4>" {
-						t.Error("NewDB() fails in asic2 connection")
-					}
-				})
+				if mdb[dbName] != "Redis</var/run/redis2/redis.sock db:4>" {
+					t.Error("NewDB() fails in asic2 connection")
+				}
 			case "asic3":
-				t.Run("Asic3Connection", func(t *testing.T) {
-					if mdb[dbName] != "Redis</var/run/redis3/redis.sock db:4>" {
-						t.Error("NewDB() fails in asic3 connection")
-					}
-				})
+				if mdb[dbName] != "Redis</var/run/redis3/redis.sock db:4>" {
+					t.Error("NewDB() fails in asic3 connection")
+				}
 			default:
 				t.Errorf("Unexpected database name: %s", dbName)
 			}
@@ -1178,21 +1163,31 @@ func TestNewDB(t *testing.T) {
 }
 
 func TestGetNumAsic(t *testing.T) {
-	AsicNum := getNumAsic()
-	if AsicNum != 4 {
-		t.Errorf("GetNumAsic is less than 4 and AsicNum value is %v", AsicNum)
+	got := getNumAsic()
+	if got != NumAsic {
+		t.Errorf("getNumAsic()=%d want NumAsic=%d", got, NumAsic)
 	}
-	fmt.Printf("GetNumAsic is executing... AsicNum=%d\n", AsicNum) //has to remove this print
 }
 
 func TestGetMultiDbNames(t *testing.T) {
 	multiDbNames := GetMultiDbNames()
-	t.Run("Mutli Database name host", func(t *testing.T) {
-		if multiDbNames[0] != "host" {
-			t.Error("Error in GetMultiDbNames")
+	if len(multiDbNames) == 0 || multiDbNames[0] != hostDBName {
+		t.Fatalf("GetMultiDbNames()=%v, want %q first", multiDbNames, hostDBName)
+	}
+	if isMultiAsic() {
+		if len(multiDbNames) != NumAsic+1 {
+			t.Errorf("multi-ASIC: GetMultiDbNames len=%d want %d (host + %d asics)",
+				len(multiDbNames), NumAsic+1, NumAsic)
 		}
-	})
-	fmt.Printf("GetMultiDbNames is executing...mutiDbNames=%v\n", multiDbNames) //has to remove this print
+		for i := 1; i <= NumAsic; i++ {
+			want := getDbNameBySlotNum(i)
+			if multiDbNames[i] != want {
+				t.Errorf("GetMultiDbNames()[%d]=%q want %q", i, multiDbNames[i], want)
+			}
+		}
+	} else if len(multiDbNames) != 1 {
+		t.Errorf("single-ASIC: GetMultiDbNames()=%v want only host", multiDbNames)
+	}
 }
 
 func TestInitAllDbs(t *testing.T) {
@@ -1200,41 +1195,36 @@ func TestInitAllDbs(t *testing.T) {
 }
 
 func TestLoadGlobalDatabase(t *testing.T) {
-	globalDatabase := loadGlobalDatabase("/var/run/redis/sonic-db/database_global.json")
+	if !isMultiAsic() {
+		t.Skip("multi-ASIC global database layout only")
+	}
+	globalDatabase, _, err := mdb.ConfigPathsForInit(NumAsic, "", "/var/run/redis/sonic-db/database_global.json")
+	if err != nil {
+		t.Fatalf("ConfigPathsForInit: %v", err)
+	}
 	for _, dbName := range GetMultiDbNames() {
 		t.Run("Loading global database on "+dbName, func(t *testing.T) {
-			fmt.Printf("Loading global database on %s and value of %v and type is %T", dbName, globalDatabase[dbName], globalDatabase[dbName])
 			switch dbName {
 			case "host":
-				t.Run("Host Database", func(t *testing.T) {
-					if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis/sonic-db/database_config.json" {
-						t.Errorf("Error in loading host database %s", dbName)
-					}
-				})
+				if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis/sonic-db/database_config.json" {
+					t.Errorf("Error in loading host database %s", dbName)
+				}
 			case "asic0":
-				t.Run("Asic0 Database", func(t *testing.T) {
-					if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis0/sonic-db/database_config.json" {
-						t.Errorf("Error in loading asic0  database %s", dbName)
-					}
-				})
+				if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis0/sonic-db/database_config.json" {
+					t.Errorf("Error in loading asic0  database %s", dbName)
+				}
 			case "asic1":
-				t.Run("Asic1 Database", func(t *testing.T) {
-					if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis1/sonic-db/database_config.json" {
-						t.Errorf("Error in loading asic1 database %s", dbName)
-					}
-				})
+				if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis1/sonic-db/database_config.json" {
+					t.Errorf("Error in loading asic1 database %s", dbName)
+				}
 			case "asic2":
-				t.Run("Asic2 Database", func(t *testing.T) {
-					if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis2/sonic-db/database_config.json" {
-						t.Errorf("Error in loading asic2 database %s", dbName)
-					}
-				})
+				if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis2/sonic-db/database_config.json" {
+					t.Errorf("Error in loading asic2 database %s", dbName)
+				}
 			case "asic3":
-				t.Run("Asic3 Database", func(t *testing.T) {
-					if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis3/sonic-db/database_config.json" {
-						t.Errorf("Error in loading asic3 database %s", dbName)
-					}
-				})
+				if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis3/sonic-db/database_config.json" {
+					t.Errorf("Error in loading asic3 database %s", dbName)
+				}
 			default:
 				t.Errorf("Unexpected database name: %s", dbName)
 			}

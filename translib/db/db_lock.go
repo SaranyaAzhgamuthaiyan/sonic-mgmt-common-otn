@@ -124,7 +124,7 @@ func (lt *LockStruct) unlock(multiDbName string) error {
 		[]string{lt.Name, lt.comm, lt.Id}).Result(); err == nil {
 
 		if intReply, ok := reply.(int64); !ok {
-			glog.Errorf("unlock Reply %v Not int64: %v Type: %v",
+			glog.Errorf("unlock: Reply %v Not int64: %v Type: %v",
 				lt, reply, reflect.TypeOf(reply))
 			err = tlerr.TranslibDBScriptFail{Description: "Unexpected response"}
 		} else if intReply == 1 {
@@ -183,7 +183,6 @@ func ConfigDBTryLock(token string, multiDbName string) error {
 	var ls map[string]*LockStruct // Local lock struct map for this invocation
 
 	glog.Infof("ConfigDBTryLock: mdbname:%v", multiDbName)
-
 	if bool(glog.V(3)) || !flag.Parsed() {
 		dumpStack(7, 13)
 	} else {

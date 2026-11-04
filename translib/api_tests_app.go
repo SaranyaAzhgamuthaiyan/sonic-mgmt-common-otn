@@ -198,7 +198,6 @@ func (app *apiTests) getNamespace(path string, payload []byte) ([]string, error)
 	var res []string
 
 	res = append(res, "host")
-	glog.Info("Apitestsapp:getNamespace response", res)
 
 	return res, nil
 }
