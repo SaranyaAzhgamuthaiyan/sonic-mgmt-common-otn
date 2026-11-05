@@ -21,12 +21,11 @@ package db
 
 import (
 	// "sync"
-	"context"
 	"time"
 
 	"github.com/Azure/sonic-mgmt-common/translib/tlerr"
+	"github.com/go-redis/redis/v7"
 	"github.com/golang/glog"
-	"github.com/redis/go-redis/v9"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -59,8 +58,8 @@ func PubSubRpcDB(opt Options, responseChannel string) (*DB, error) {
 
 	// responseChannel db.Subscribe()
 	// db.receive ()
-	d.rPubSub = d.client.Subscribe(context.Background(), responseChannel)
-	msg, e := d.rPubSub.Receive(context.Background())
+	d.rPubSub = d.client.Subscribe(responseChannel)
+	msg, e := d.rPubSub.Receive()
 	if e != nil {
 		glog.Error("PubSubRpcDB: ", d.Name(), ": ", responseChannel,
 			": Receive() Error: ", e.Error())
@@ -93,7 +92,7 @@ func (d *DB) SendRpcRequest(requestChannel string, message string) (int, error) 
 	}
 
 	// Publish on this channel
-	listeners, e := d.client.Publish(context.Background(), requestChannel, message).Result()
+	listeners, e := d.client.Publish(requestChannel, message).Result()
 
 	if glog.V(3) {
 		glog.Info("SendRpcRequest: End: listeners: ", requestChannel,

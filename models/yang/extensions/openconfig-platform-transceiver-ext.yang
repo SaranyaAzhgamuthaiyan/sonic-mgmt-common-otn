@@ -1,0 +1,145 @@
+module openconfig-platform-transceiver-ext {
+
+  yang-version "1.1";
+
+  namespace "http://openconfig.net/yang/platform/transceiver/extension";
+
+  prefix "oc-transceiver-ext";
+
+  import openconfig-platform { prefix oc-platform; }
+  import openconfig-platform-transceiver { prefix oc-transceiver; }
+  import openconfig-transport-types { prefix oc-opt-types; }
+  import openconfig-extensions { prefix oc-ext; }
+
+  organization
+    "SONiC";
+
+  contact
+    "SONiC";
+
+  description
+    "Vendor constraints for openconfig-platform-transceiver.
+
+    Standard OpenConfig already defines physical-channel optical
+    power and frequency leaves. Those leaves stay in the official
+    module so network management tools keep a stable OC path.
+
+    This module attaches extra rules by augmenting the original
+    physical-channel nodes (not by adding must via deviation):
+    * Extended physical-channel optical state is valid only for
+      TYPE_STANDARD_OPTIC.
+    * TYPE_DIGITAL_COHERENT_OPTIC must use the optical-channel
+      component instead of duplicating those leaves on the
+      physical-channel.
+
+    XPath uses ancestor:: so the rule does not break if intermediate
+    containers are added later.";
+
+  oc-ext:openconfig-version "0.1.1";
+
+  revision "2026-08-18" {
+    description
+      "Attach constraints via augment instead of deviate add must.";
+    reference "0.1.1";
+  }
+
+  grouping physical-channel-config-constraints {
+    description
+      "Must rules for physical-channel config leaves.";
+
+    container vendor-constraints {
+      description
+        "Attachment point for vendor config must statements.
+        Sibling OpenConfig leaves are referenced as ..";
+
+      must
+        "not(../oc-transceiver:target-output-power) "
+      + "or derived-from-or-self("
+      + "     ancestor::oc-transceiver:transceiver/oc-transceiver:config/oc-transceiver:module-functional-type, "
+      + "     'oc-opt-types:TYPE_STANDARD_OPTIC')" {
+        error-message
+          "Physical-channel target-output-power is valid only when "
+        + "module-functional-type is TYPE_STANDARD_OPTIC.";
+        error-app-tag "physical-channel-target-power-standard-optic-only";
+      }
+
+      must
+        "not(derived-from-or-self("
+      + "      ancestor::oc-transceiver:transceiver/oc-transceiver:config/oc-transceiver:module-functional-type, "
+      + "      'oc-opt-types:TYPE_DIGITAL_COHERENT_OPTIC') "
+      + "    and ../oc-transceiver:associated-optical-channel "
+      + "    and ../oc-transceiver:target-output-power)" {
+        error-message
+          "TYPE_DIGITAL_COHERENT_OPTIC physical-channels that reference "
+        + "an optical-channel must not set target-output-power on the "
+        + "physical-channel. Use the associated optical-channel "
+        + "component instead.";
+        error-app-tag "dco-physical-channel-target-power-forbidden";
+      }
+    }
+  }
+
+  grouping physical-channel-state-constraints {
+    description
+      "Must rules for physical-channel state leaves.";
+
+    container vendor-constraints {
+      config false;
+      description
+        "Attachment point for vendor state must statements.
+        Sibling OpenConfig leaves are referenced as ..";
+
+      must
+        "not(../oc-transceiver:output-frequency or "
+      + "    ../oc-transceiver:output-power/oc-transceiver:instant or "
+      + "    ../oc-transceiver:laser-bias-current/oc-transceiver:instant) "
+      + "or derived-from-or-self("
+      + "     ancestor::oc-transceiver:transceiver/oc-transceiver:state/oc-transceiver:module-functional-type, "
+      + "     'oc-opt-types:TYPE_STANDARD_OPTIC')" {
+        error-message
+          "Physical-channel output-frequency, output-power and "
+        + "laser-bias-current are valid only when module-functional-type "
+        + "is TYPE_STANDARD_OPTIC.";
+        error-app-tag "physical-channel-extended-state-standard-optic-only";
+      }
+
+      must
+        "not(derived-from-or-self("
+      + "      ancestor::oc-transceiver:transceiver/oc-transceiver:state/oc-transceiver:module-functional-type, "
+      + "      'oc-opt-types:TYPE_DIGITAL_COHERENT_OPTIC') "
+      + "    and ../oc-transceiver:associated-optical-channel "
+      + "    and (../oc-transceiver:output-frequency "
+      + "         or ../oc-transceiver:output-power/oc-transceiver:instant "
+      + "         or ../oc-transceiver:laser-bias-current/oc-transceiver:instant))" {
+        error-message
+          "TYPE_DIGITAL_COHERENT_OPTIC physical-channels that reference "
+        + "an optical-channel must not set output-frequency, output-power "
+        + "or laser-bias-current on the physical-channel. Use the "
+        + "associated optical-channel component instead.";
+        error-app-tag "dco-physical-channel-optics-forbidden";
+      }
+    }
+  }
+
+  augment "/oc-platform:components/oc-platform:component/" +
+          "oc-transceiver:transceiver/" +
+          "oc-transceiver:physical-channels/oc-transceiver:channel/" +
+          "oc-transceiver:config" {
+    description
+      "Attach DCO config constraints to the official physical-channel
+      config container.";
+    uses physical-channel-config-constraints;
+  }
+
+  // ancestor::oc-transceiver:transceiver is stable across extra
+  // containers under transceiver; '../../../state/...' is not.
+  augment "/oc-platform:components/oc-platform:component/" +
+          "oc-transceiver:transceiver/" +
+          "oc-transceiver:physical-channels/oc-transceiver:channel/" +
+          "oc-transceiver:state" {
+    description
+      "Attach standard-optic and DCO state constraints to the official
+      physical-channel state container.";
+    uses physical-channel-state-constraints;
+  }
+}

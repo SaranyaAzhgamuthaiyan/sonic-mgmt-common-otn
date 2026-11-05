@@ -124,6 +124,7 @@ func TestGetTablePatternCompOrigEmpty(t *testing.T) {
 func TestGetTablePattern_txCache(t *testing.T) {
 	d := newTestDB(t, Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		DisableCVLCheck:         true,
 		ForceNewRedisConnection: true,
 		KeySeparator:            "|",
@@ -134,7 +135,6 @@ func TestGetTablePattern_txCache(t *testing.T) {
 		"TEST_INTERFACE|Ethernet1":              {"NULL": "NULL"},
 		"TEST_INTERFACE|Ethernet1|101.0.0.1/24": {"NULL": "NULL"},
 	})
-
 	testTable := &TableSpec{Name: "TEST_INTERFACE"}
 	nullValue := Value{map[string]string{"NULL": "NULL"}}
 	vrfValue1 := Value{map[string]string{"vrf": "Vrf1"}}

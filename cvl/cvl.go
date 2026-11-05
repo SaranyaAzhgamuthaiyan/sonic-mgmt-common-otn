@@ -21,23 +21,23 @@ package cvl
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
+	"unsafe"
 
 	cmn "github.com/Azure/sonic-mgmt-common/cvl/common"
+	custv "github.com/Azure/sonic-mgmt-common/cvl/custom_validation"
 	"github.com/Azure/sonic-mgmt-common/cvl/internal/yparser"
 	"github.com/antchfx/jsonquery"
 	"github.com/antchfx/xmlquery"
 	"github.com/antchfx/xpath"
 	"github.com/go-redis/redis/v7"
-	"io/ioutil"
-	"path/filepath"
-	"sync"
-	"unsafe"
 
-	custv "github.com/Azure/sonic-mgmt-common/cvl/custom_validation"
 	//lint:ignore ST1001 This is safe to dot import for util package
 	. "github.com/Azure/sonic-mgmt-common/cvl/internal/util"
 )
@@ -1125,7 +1125,8 @@ func (c *CVL) doCustomValidation(node *xmlquery.Node,
 			YNodeVal:  nodeVal,
 			YCur:      node,
 			SessCache: &(c.custvCache),
-			RClient:   c.dbAccess}
+			RClient:   c.dbAccess,
+			NameSpace: c.dbAccess.GetMDBName()}
 		for _, custFunction := range custFuncs {
 			CVL_LOG(INFO_TRACE, "Calling custom validation function %s", custFunction)
 			errObj := custv.InvokeCustomValidation(&custv.CustomValidation{}, custFunction, pCustv)

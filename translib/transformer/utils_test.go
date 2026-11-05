@@ -19,7 +19,6 @@
 package transformer_test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -28,7 +27,7 @@ import (
 
 	. "github.com/Azure/sonic-mgmt-common/translib"
 	db "github.com/Azure/sonic-mgmt-common/translib/db"
-	"github.com/redis/go-redis/v9"
+	"github.com/go-redis/redis/v7"
 )
 
 type queryParamsUT struct {
@@ -75,7 +74,12 @@ func processGetRequest(url string, qparams *queryParamsUT, expectedRespJson stri
 			t.Fatalf("failed to unmarshal %v err: %v", expectedRespJson, err)
 		}
 
-		respJson := response.Payload
+		var respJson []byte
+		if len(response) == 0 {
+			respJson = []byte("{}")
+		} else {
+			respJson = response[0].Payload
+		}
 		err = json.Unmarshal(respJson, &receivedMap)
 		if err != nil {
 			t.Fatalf("failed to unmarshal %v err: %v", string(respJson), err)
@@ -111,7 +115,10 @@ func processGetRequestWithFile(url string, expectedJsonFile string, errorCase bo
 			return
 		}
 
-		respJson := response.Payload
+		if len(response) == 0 {
+			t.Fatalf("empty Get response for Url: %s", url)
+		}
+		respJson := response[0].Payload
 		err = json.Unmarshal(respJson, &receivedMap)
 		if err != nil {
 			t.Fatalf("failed to unmarshal %v err: %v", string(respJson), err)
@@ -217,7 +224,7 @@ func getConfigDb() *db.DB {
 
 func verifyDbResult(client *redis.Client, key string, expectedResult map[string]interface{}, errorCase bool) func(*testing.T) {
 	return func(t *testing.T) {
-		result, err := client.HGetAll(context.Background(), key).Result()
+		result, err := client.HGetAll(key).Result()
 		if err != nil {
 			t.Fatalf("Error %v hgetall for key: %s", err, key)
 		}

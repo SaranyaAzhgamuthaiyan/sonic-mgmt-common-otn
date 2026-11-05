@@ -120,6 +120,11 @@ func init() {
 	XlateFuncBind("DbToYang_pathz_policies_key_xfmr", DbToYang_pathz_policies_key_xfmr)
 	XlateFuncBind("DbToYang_console_counters_xfmr", DbToYang_console_counters_xfmr)
 	XlateFuncBind("Subscribe_console_counters_xfmr", Subscribe_console_counters_xfmr)
+	/* Key transformer for CURALARM_TABLE table*/
+	XlateFuncBind("YangToDb_oc_system_alarm_key_xfmr", YangToDb_oc_system_alarm_key_xfmr)
+	XlateFuncBind("DbToYang_oc_system_alarm_key_xfmr", DbToYang_oc_system_alarm_key_xfmr)
+	/* Get Namespace transformer for platform table*/
+	XlateFuncBind("oc_sys_get_namespace_xfmr", oc_sys_get_namespace_xfmr)
 }
 
 type grpcState struct {
@@ -933,4 +938,44 @@ var Subscribe_console_counters_xfmr SubTreeXfmrSubscribe = func(inParams XfmrSub
 		onChange: OnchangeEnable,
 		nOpts:    &notificationOpts{mInterval: 0, pType: OnChange},
 	}, nil
+}
+
+var YangToDb_oc_system_alarm_key_xfmr KeyXfmrYangToDb = func(inParams XfmrParams) (string, error) {
+
+	log.V(3).Infof("YangToDb_oc_system_alarm_key_xfmr: root: ", inParams.ygRoot,
+		", uri: ", inParams.uri)
+	pathInfo := NewPathInfo(inParams.uri)
+	key := pathInfo.Var("id")
+	log.V(3).Infof("YangToDb_oc_system_alarm_key_xfmr: :", key)
+
+	return key, nil
+}
+
+var DbToYang_oc_system_alarm_key_xfmr KeyXfmrDbToYang = func(inParams XfmrParams) (map[string]interface{}, error) {
+
+	rmap := make(map[string]interface{}, 1)
+	log.V(3).Infof("DbToYang_oc_system_alarm_key_xfmr: ", inParams.key)
+	rmap["id"] = inParams.key
+
+	return rmap, nil
+}
+
+var oc_sys_get_namespace_xfmr GetNamespaceFunc = func(inParams XfmrParams) ([]NamespacePayload, error) {
+	return []NamespacePayload{
+		{
+			Namespace: "*",
+			Payloads:  []map[string]interface{}{},
+			Key:       "*",
+		},
+	}, nil
+
+}
+
+// Define a new implementation for GetNamespaceFunc
+func customSysGetNamespaceFunc(inParams XfmrParams) ([]NamespacePayload, error) {
+
+	// Your custom implementation here
+	nameSpaceList, err := oc_sys_get_namespace_xfmr(inParams)
+
+	return nameSpaceList, err
 }

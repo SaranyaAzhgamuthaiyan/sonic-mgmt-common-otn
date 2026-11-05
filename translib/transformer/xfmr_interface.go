@@ -57,6 +57,7 @@ type XfmrParams struct {
 	invokeCRUSubtreeOnce *bool
 	ctxt                 context.Context
 	isNotTblOwner        *bool
+	body                 []byte
 }
 
 // SubscProcType represents subcription process type identifying the type of subscription request made from translib.
@@ -144,6 +145,13 @@ type XfmrDbToYgPathParams struct {
 	ygPathKeys    map[string]string //to keep translated yang keys as values for the each yang key leaf node
 }
 
+type NamespacePayload struct {
+	Namespace string
+	Payloads  []map[string]interface{}
+	Key       string
+	Commited  bool
+}
+
 // KeyXfmrYangToDb type is defined to use for conversion of Yang key to DB Key,
 // Transformer function definition.
 // Param: XfmrParams structure having Database info, YgotRoot, operation, Xpath
@@ -207,6 +215,11 @@ type PostXfmrFunc func(inParams XfmrParams) error
 // Return: List of table names, error
 type TableXfmrFunc func(inParams XfmrParams) ([]string, error)
 
+// GetNamespaceFunc type is defined to retrieve namespace associated with the uri path/payload.
+// Param: XfmrParams structure having operation, uri
+// Return: Array of NamespacePayload struct, error
+type GetNamespaceFunc func(inParams XfmrParams) ([]NamespacePayload, error)
+
 // ValueXfmrFunc type is defined to use for conversion of DB field value from one forma to another
 // Transformer function definition.
 // Param: XfmrDbParams structure having Database info, operation, db-number, table, key, field, value
@@ -260,6 +273,9 @@ func (SubTreeXfmrSubscribe) xfmrInterfaceValiidate() {
 }
 func (TableXfmrFunc) xfmrInterfaceValiidate() {
 	xfmrLogInfo("xfmrInterfaceValiidate for TableXfmrFunc")
+}
+func (GetNamespaceFunc) xfmrInterfaceValiidate() {
+	xfmrLogInfo("xfmrInterfaceValiidate for GetNamespaceFunc")
 }
 func (SonicKeyXfmrDbToYang) xfmrInterfaceValiidate() {
 	xfmrLogInfo("xfmrInterfaceValiidate for SonicKeyXfmrDbToYang")

@@ -325,7 +325,8 @@ func TestValidateEditConfig_MustExp_With_Default_Value_Negative(t *testing.T) {
 		},
 	}
 
-	cvSess, _ := NewCvlSession()
+	d := getMDBInstance(hostDBName)
+	cvSess, _ := NewCvlSession(d)
 
 	//Try to add second element
 	cvlErrInfo, _ := cvSess.ValidateEditConfig(cfgData)
@@ -659,7 +660,8 @@ func TestValidateEditConfig_MustExp_Add_NULL(t *testing.T) {
 
 func testNullAdd(data ...cmn.CVLEditConfigData) func(*testing.T) {
 	return func(t *testing.T) {
-		session, _ := NewCvlSession()
+		d := getMDBInstance(hostDBName)
+		session, _ := NewCvlSession(d)
 		defer cvl.ValidationSessClose(session)
 
 		var cfgData []cmn.CVLEditConfigData

@@ -20,13 +20,12 @@
 package db
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"sync"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/go-redis/redis/v7"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -177,7 +176,7 @@ func NewRedisConfigDBClient() (*redis.Client, error) {
 	if client == nil {
 		return nil, fmt.Errorf("Cannot create Redis Config DB client.")
 	}
-	if _, err := client.Ping(context.Background()).Result(); err != nil {
+	if _, err := client.Ping().Result(); err != nil {
 		return nil, err
 	}
 	return client, nil
@@ -528,7 +527,7 @@ func (config *DBStatsConfig) handleReconfigureSignal() error {
 ////////////////////////////////////////////////////////////////////////////////
 
 func (config *DBStatsConfig) readFromDB() error {
-	fields, e := readRedis("TRANSLIB_DB|default")
+	fields, e := readRedis("TRANSLIB_DB|default", "host")
 	if e != nil {
 		config.TimeStats = defaultDBStatsConfig.TimeStats
 		config.TableStats = defaultDBStatsConfig.TableStats
@@ -558,11 +557,34 @@ func (config *DBStatsConfig) readFromDB() error {
 //  Utility Function to read Redis DB                                         //
 ////////////////////////////////////////////////////////////////////////////////
 
-func readRedis(key string) (map[string]string, error) {
-	client := RedisClient(ConfigDB)
-	defer CloseRedisClient(client)
+func readRedis(key string, multiDbName string) (map[string]string, error) {
 
-	fields, e := client.HGetAll(context.Background(), key).Result()
+	ipAddr := DefaultRedisLocalTCPEP
+	dbId := int(ConfigDB)
+	dbPassword := ""
+	if dbInstName := getDBInstName(ConfigDB); dbInstName != "" {
+		// Appending the namespace along with DBName
+		dbInstName = dbInstName + "." + multiDbName
+
+		if isDbInstPresent(dbInstName) {
+			ipAddr = getDbTcpAddr(dbInstName)
+			dbId = getDbId(dbInstName)
+			dbPassword = getDbPassword(dbInstName)
+		}
+	}
+
+	client := redis.NewClient(&redis.Options{
+		Network:     "tcp",
+		Addr:        ipAddr,
+		Password:    dbPassword,
+		DB:          dbId,
+		DialTimeout: 0,
+		PoolSize:    1,
+	})
+
+	fields, e := client.HGetAll(key).Result()
+
+	client.Close()
 
 	return fields, e
 }

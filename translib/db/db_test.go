@@ -20,7 +20,6 @@
 package db
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -29,7 +28,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/Azure/sonic-mgmt-common/internal/mdb"
+	"github.com/go-redis/redis/v7"
 )
 
 var dbConfig = `
@@ -118,6 +118,7 @@ var dbOnC *DB
 func newReadOnlyDB(dBNum DBNum) (*DB, error) {
 	d, e := NewDB(Options{
 		DBNo:                    dBNum,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -131,6 +132,7 @@ func newReadOnlyDB(dBNum DBNum) (*DB, error) {
 func newOnCDB(dBNum DBNum) (*DB, error) {
 	d, e := NewDB(Options{
 		DBNo:                    dBNum,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -146,10 +148,10 @@ func newOnCDB(dBNum DBNum) (*DB, error) {
 // whne the test case ends.
 func setupTestData(t *testing.T, redis *redis.Client, data map[string]map[string]interface{}) {
 	keys := make([]string, 0, len(data))
-	t.Cleanup(func() { redis.Del(context.Background(), keys...) })
+	t.Cleanup(func() { redis.Del(keys...) })
 	for k, v := range data {
 		keys = append(keys, k)
-		if _, err := redis.HMSet(context.Background(), k, v).Result(); err != nil {
+		if _, err := redis.HMSet(k, v).Result(); err != nil {
 			t.Fatalf("HMSET %s failed; err=%v", k, err)
 		}
 	}
@@ -234,6 +236,7 @@ func TestMain(m *testing.M) {
 
 */
 
+/*
 func TestNewDB(t *testing.T) {
 
 	d, e := NewDB(Options{
@@ -251,6 +254,7 @@ func TestNewDB(t *testing.T) {
 		t.Errorf("DeleteDB() fails e = %v", e)
 	}
 }
+*/
 
 /*
 
@@ -268,6 +272,7 @@ func TestNoTransaction(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -335,6 +340,7 @@ func TestTable(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -520,6 +526,7 @@ func TestTransactionCacheWithDBContentKeysPattern(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -618,6 +625,7 @@ func TestTransactionCacheMultiKeysPattern(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -716,6 +724,7 @@ func TestTransactionCacheWithDBContentKeys(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -793,6 +802,7 @@ func TestTransactionCacheWithDBContentDel(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -868,6 +878,7 @@ func TestTransactionCacheWithDBContentDelFields(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -950,6 +961,7 @@ func TestTransactionCacheWithDBContentMod(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -1031,6 +1043,7 @@ func TestTransactionCacheWithDBContentSet(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -1099,12 +1112,141 @@ func TestTransactionCacheWithDBContentSet(t *testing.T) {
 	}
 }
 
+func TestNewDB(t *testing.T) {
+	mdb := make(map[string]string)
+	for _, name := range GetMultiDbNames() {
+		d, e := NewDB(Options{
+			DBNo:               ConfigDB,
+			MDBName:            name,
+			InitIndicator:      "",
+			TableNameSeparator: "|",
+			KeySeparator:       "|",
+			DisableCVLCheck:    true,
+		})
+		if d == nil {
+			t.Errorf("NewDB() fails e = %v", e)
+			continue
+		}
+		mdb[name] = ClientToString(d.client)
+		if e = d.DeleteDB(); e != nil {
+			t.Errorf("DeleteDB() fails e = %v", e)
+		}
+	}
+	for dbName := range mdb {
+		t.Run("Connection_"+dbName, func(t *testing.T) {
+			switch dbName {
+			case "host":
+				if mdb[dbName] != "Redis</var/run/redis/redis.sock db:4>" {
+					t.Error("NewDB() fails in host connection")
+				}
+			case "asic0":
+				if mdb[dbName] != "Redis</var/run/redis0/redis.sock db:4>" {
+					t.Error("NewDB() fails in asic0 connection")
+				}
+			case "asic1":
+				if mdb[dbName] != "Redis</var/run/redis1/redis.sock db:4>" {
+					t.Error("NewDB() fails in asic1 connection")
+				}
+			case "asic2":
+				if mdb[dbName] != "Redis</var/run/redis2/redis.sock db:4>" {
+					t.Error("NewDB() fails in asic2 connection")
+				}
+			case "asic3":
+				if mdb[dbName] != "Redis</var/run/redis3/redis.sock db:4>" {
+					t.Error("NewDB() fails in asic3 connection")
+				}
+			default:
+				t.Errorf("Unexpected database name: %s", dbName)
+			}
+		})
+	}
+}
+
+func TestGetNumAsic(t *testing.T) {
+	got := getNumAsic()
+	if got != NumAsic {
+		t.Errorf("getNumAsic()=%d want NumAsic=%d", got, NumAsic)
+	}
+}
+
+func TestGetMultiDbNames(t *testing.T) {
+	multiDbNames := GetMultiDbNames()
+	if len(multiDbNames) == 0 || multiDbNames[0] != hostDBName {
+		t.Fatalf("GetMultiDbNames()=%v, want %q first", multiDbNames, hostDBName)
+	}
+	if isMultiAsic() {
+		if len(multiDbNames) != NumAsic+1 {
+			t.Errorf("multi-ASIC: GetMultiDbNames len=%d want %d (host + %d asics)",
+				len(multiDbNames), NumAsic+1, NumAsic)
+		}
+		for i := 1; i <= NumAsic; i++ {
+			want := getDbNameBySlotNum(i)
+			if multiDbNames[i] != want {
+				t.Errorf("GetMultiDbNames()[%d]=%q want %q", i, multiDbNames[i], want)
+			}
+		}
+	} else if len(multiDbNames) != 1 {
+		t.Errorf("single-ASIC: GetMultiDbNames()=%v want only host", multiDbNames)
+	}
+}
+
+func TestInitAllDbs(t *testing.T) {
+	initAllDbs()
+}
+
+func TestLoadGlobalDatabase(t *testing.T) {
+	if !isMultiAsic() {
+		t.Skip("multi-ASIC global database layout only")
+	}
+	globalDatabase, _, err := mdb.ConfigPathsForInit(NumAsic, "", "/var/run/redis/sonic-db/database_global.json")
+	if err != nil {
+		t.Fatalf("ConfigPathsForInit: %v", err)
+	}
+	for _, dbName := range GetMultiDbNames() {
+		t.Run("Loading global database on "+dbName, func(t *testing.T) {
+			switch dbName {
+			case "host":
+				if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis/sonic-db/database_config.json" {
+					t.Errorf("Error in loading host database %s", dbName)
+				}
+			case "asic0":
+				if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis0/sonic-db/database_config.json" {
+					t.Errorf("Error in loading asic0  database %s", dbName)
+				}
+			case "asic1":
+				if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis1/sonic-db/database_config.json" {
+					t.Errorf("Error in loading asic1 database %s", dbName)
+				}
+			case "asic2":
+				if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis2/sonic-db/database_config.json" {
+					t.Errorf("Error in loading asic2 database %s", dbName)
+				}
+			case "asic3":
+				if globalDatabase[dbName] != "/var/run/redis/sonic-db/../../redis3/sonic-db/database_config.json" {
+					t.Errorf("Error in loading asic3 database %s", dbName)
+				}
+			default:
+				t.Errorf("Unexpected database name: %s", dbName)
+			}
+		})
+	}
+}
+
+func ClientToString(client *redis.Client) string {
+	options := client.Options()
+	addr := options.Addr
+	db := options.DB
+
+	return fmt.Sprintf("Redis<%s db:%d>", addr, db)
+}
+
 func testTransactionCache(t *testing.T, transRun TransRun) {
 
 	var pid int = os.Getpid()
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -1379,6 +1521,7 @@ func testTransaction(t *testing.T, transRun TransRun) {
 
 	d, e := NewDB(Options{
 		DBNo:               ConfigDB,
+		MDBName:            hostDBName,
 		InitIndicator:      "",
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
@@ -1487,6 +1630,7 @@ func testTransaction(t *testing.T, transRun TransRun) {
 	case TransRunFailWatchKeys, TransRunFailTable:
 		d2, e2 := NewDB(Options{
 			DBNo:                    ConfigDB,
+			MDBName:                 hostDBName,
 			InitIndicator:           "",
 			TableNameSeparator:      "|",
 			KeySeparator:            "|",
@@ -1542,6 +1686,7 @@ func TestMap(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -1587,6 +1732,7 @@ func TestSubscribe(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -1616,6 +1762,7 @@ func TestSubscribe(t *testing.T) {
 
 	s, e := SubscribeDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -1623,7 +1770,7 @@ func TestSubscribe(t *testing.T) {
 		ForceNewRedisConnection: true,
 	}, skeys, func(s *DB,
 		skey *SKey, key *Key,
-		event SEvent) error {
+		event SEvent, dbName string) error {
 		switch event {
 		case SEventHSet:
 			hSetCalled = true
@@ -1802,7 +1949,7 @@ func TestCloseRedisClient(t *testing.T) {
 
 			if test.client != nil {
 				// The client should only be closed for transactional clients
-				_, err := test.client.Ping(context.Background()).Result()
+				_, err := test.client.Ping().Result()
 				/* This if case is added because connections close status changes based on usePools"*/
 				if (test.name == "ValidRedisClient") && (*usePools == false) {
 					if (err == nil) == !test.closed {
@@ -1877,7 +2024,7 @@ func TestConnectionPoolDisable(t *testing.T) {
 	client := RedisClient(ConfigDB)
 	defer CloseRedisClient(client)
 
-	if err := client.Ping(context.Background()).Err(); err != nil {
+	if err := client.Ping().Err(); err != nil {
 		t.Fatalf("Failed to create client: %v", err)
 	}
 	if ps := client.Options().PoolSize; ps != 1 {
@@ -2130,7 +2277,7 @@ func TestRedisClientPoolExhaustion(t *testing.T) {
 
 	rc := createRedisClient(ConfigDB, testPoolSize)
 	defer rc.Close()
-	if err := rc.HSet(context.Background(), "REDIS_TEST_TABLE|test", map[string]interface{}{"test_field": "test_value"}).Err(); err != nil {
+	if err := rc.HSet("REDIS_TEST_TABLE|test", map[string]interface{}{"test_field": "test_value"}).Err(); err != nil {
 		t.Fatalf("Failed to set test data: %v", err)
 	}
 
@@ -2139,7 +2286,7 @@ func TestRedisClientPoolExhaustion(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			entry, err := rc.HGetAll(context.Background(), "REDIS_TEST_TABLE|test").Result()
+			entry, err := rc.HGetAll("REDIS_TEST_TABLE|test").Result()
 			if err != nil {
 				t.Fatalf("Failed to read the test table: %v", err)
 			}

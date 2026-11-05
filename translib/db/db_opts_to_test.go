@@ -29,7 +29,6 @@ import (
 
 	// "github.com/Azure/sonic-mgmt-common/translib/tlerr"
 	// "os/exec"
-	"context"
 	"os"
 
 	// "reflect"
@@ -39,17 +38,29 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/go-redis/redis/v7"
 )
+
+func killRedisScripts(dbName string) {
+	client, err := getStateDB(dbName)
+	if err != nil {
+		return
+	}
+	defer CloseRedisClient(client)
+	client.ScriptKill()
+}
 
 func TestDefaultTimeout(t *testing.T) {
 
 	var pid int = os.Getpid()
 
+	killRedisScripts(hostDBName)
+
 	t.Logf("TestDefaultTimeout: %s: begin", time.Now().String())
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -84,8 +95,8 @@ func TestDefaultTimeout(t *testing.T) {
 	if e != nil {
 		t.Logf("GetEntry() got error e = %v", e)
 		s := e.Error()
-		if !(strings.HasPrefix(s, "i/o timeout") ||
-			strings.HasPrefix(s, "BUSY")) {
+		// go-redis prefixes timeout errors (e.g. "read unix @->...: i/o timeout").
+		if !(strings.Contains(s, "i/o timeout") || strings.HasPrefix(s, "BUSY")) {
 			t.Errorf("GetEntry() Expecting timeout, BUSY... e = %v", e)
 		}
 	} else {
@@ -113,10 +124,13 @@ func blockLUAScript(wg *sync.WaitGroup, secs int, t *testing.T) {
 
 	defer wg.Done()
 
+	killRedisScripts(hostDBName)
+
 	t.Logf("blockLUAScript: %s: begin: secs: %v", time.Now().String(), secs)
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
+		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -139,7 +153,7 @@ end
 return i
 `)
 
-	if _, e := luaScript.Run(context.Background(), d.client, []string{}, secs).Int(); e != nil {
+	if _, e := luaScript.Run(d.client, []string{}, secs).Int(); e != nil {
 		t.Logf("blockLUAScript: luaScript.Run() fails e = %v", e)
 	}
 

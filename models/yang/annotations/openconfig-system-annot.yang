@@ -57,17 +57,71 @@ module openconfig-system-annot {
         sonic-ext:subtree-transformer "console_counters_xfmr";
       }
     }
-    deviation /oc-sys:system/oc-sys:aaa/oc-sys:authorization/oc-sys:state {
-      deviate add {
-        sonic-ext:db-name "STATE_DB";
-        sonic-ext:subtree-transformer "authz_policy_xfmr";
-      }
-    }
+
+    deviation /oc-sys:system/oc-sys:aaa/oc-sys:authorization/oc-sys:state {
+      deviate add {
+        sonic-ext:db-name "STATE_DB";
+        sonic-ext:subtree-transformer "authz_policy_xfmr";
+      }
+    }
 
     deviation /oc-sys:system/gnsi-pathz:gnmi-pathz-policies {
       deviate add {
         sonic-ext:key-transformer "pathz_policies_key_xfmr";
         sonic-ext:subtree-transformer "pathz_policies_xfmr";
+      }
+    }
+
+    deviation /oc-sys:system/oc-sys:alarms {
+      deviate add {
+        sonic-ext:db-name "STATE_DB";
+        sonic-ext:table-name "CURALARM_TABLE";
+        sonic-ext:get-namespace "oc_sys_get_namespace_xfmr";
+      }
+    }
+
+    deviation /oc-sys:system/oc-sys:alarms/oc-sys:alarm {
+      deviate add {
+        sonic-ext:key-transformer "oc_system_alarm_key_xfmr";
+      }
+    }
+
+    deviation /oc-sys:system/oc-sys:alarms/oc-sys:alarm/oc-sys:state {
+      deviate add {
+        sonic-ext:db-name "STATE_DB";
+        sonic-ext:table-name "CURALARM_TABLE";
+        sonic-ext:key-transformer "oc_system_alarm_key_xfmr";
+        sonic-ext:get-namespace "oc_sys_get_namespace_xfmr";
+      }
+    }
+
+    deviation /oc-sys:system/oc-sys:alarms/oc-sys:alarm/oc-sys:state/oc-sys:type-id {
+      deviate add {
+        sonic-ext:field-name "type-id";
+      }
+    }
+
+    deviation /oc-sys:system/oc-sys:alarms/oc-sys:alarm/oc-sys:state/oc-sys:resource {
+      deviate add {
+        sonic-ext:field-name "resource";
+      }
+    }
+
+    deviation /oc-sys:system/oc-sys:alarms/oc-sys:alarm/oc-sys:state/oc-sys:text {
+      deviate add {
+        sonic-ext:field-name "text";
+      }
+    }
+
+    deviation /oc-sys:system/oc-sys:alarms/oc-sys:alarm/oc-sys:state/oc-sys:time-created {
+      deviate add {
+        sonic-ext:field-name "time-created";
+      }
+    }
+
+    deviation /oc-sys:system/oc-sys:alarms/oc-sys:alarm/oc-sys:state/oc-sys:severity {
+      deviate add {
+        sonic-ext:field-name "severity";
       }
     }
 }

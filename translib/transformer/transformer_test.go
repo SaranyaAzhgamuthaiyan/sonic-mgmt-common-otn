@@ -19,28 +19,34 @@
 package transformer_test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 
+	"github.com/Azure/sonic-mgmt-common/internal/mdb"
 	"github.com/Azure/sonic-mgmt-common/translib/db"
 	"github.com/Azure/sonic-mgmt-common/translib/ocbinds"
+	"github.com/go-redis/redis/v7"
 	"github.com/openconfig/ygot/ytypes"
-	"github.com/redis/go-redis/v9"
 
 	"testing"
 )
+
+const hostDBName = "host"
 
 var dbConfig struct {
 	Instances map[string]map[string]interface{} `json:"INSTANCES"`
 	Databases map[string]map[string]interface{} `json:"DATABASES"`
 }
 var rclient *redis.Client
+var rclientNs map[string]*redis.Client
 var filehandle *os.File
 var ygSchema *ytypes.Schema
 var rclientDBNum map[db.DBNum]*redis.Client
+var rclientDBByNs map[string]map[db.DBNum]*redis.Client
+var mdbNames []string
 
 func getDBOptions(dbNo db.DBNum, isWriteDisabled bool) db.Options {
 	var opt db.Options
@@ -55,6 +61,33 @@ func getDBOptions(dbNo db.DBNum, isWriteDisabled bool) db.Options {
 	}
 
 	return opt
+}
+
+func initMdbNames() {
+	asicConf := mdb.DefaultAsicConfPath
+	if path, ok := os.LookupEnv("ASIC_CONFIG_PATH"); ok {
+		asicConf = path
+	}
+	numAsic := mdb.ReadNumAsic(asicConf)
+	mdbNames = []string{hostDBName}
+	if numAsic > 1 {
+		for i := 0; i < numAsic; i++ {
+			mdbNames = append(mdbNames, "asic"+strconv.Itoa(i))
+		}
+	}
+}
+
+func getMdbNames() []string {
+	return mdbNames
+}
+
+func redisClientForMdb(mdbName string, dbNum db.DBNum) *redis.Client {
+	opt := getDBOptions(dbNum, false)
+	opt.MDBName = mdbName
+	if mdbName != hostDBName {
+		opt.ForceNewRedisConnection = true
+	}
+	return db.RedisClientForOptions(opt)
 }
 
 func getDBOptionsWithSeparator(dbNo db.DBNum, initIndicator string, tableSeparator string, keySeparator string, isWriteDisabled bool) db.Options {
@@ -107,13 +140,13 @@ func clearDb() {
 
 	for dbNum, tblList := range dbNumTblList {
 		for _, tbl := range tblList {
-			tblKeys, keysErr := rclientDBNum[dbNum].Keys(context.Background(), tbl+"|*").Result()
+			tblKeys, keysErr := rclientDBNum[dbNum].Keys(tbl + "|*").Result()
 			if keysErr != nil {
 				fmt.Printf("Couldn't fetch keys for table %v", tbl)
 				continue
 			}
 			for _, key := range tblKeys {
-				e := rclientDBNum[dbNum].Del(context.Background(), key).Err()
+				e := rclientDBNum[dbNum].Del(key).Err()
 				if e != nil {
 					fmt.Printf("Couldn't delete key %v", key)
 				}
@@ -124,27 +157,31 @@ func clearDb() {
 
 /* Prepares the database clients in Redis Server. */
 func prepareDb() bool {
+	initMdbNames()
 
-	rclientDBNum = make(map[db.DBNum]*redis.Client)
-	/*Add redis client for specific DB as and how needed*/
-	rclientDBNum[db.CountersDB] = getDbClient(int(db.CountersDB))
-	if rclientDBNum[db.CountersDB] == nil {
-		fmt.Printf("error in getDbClient(int(db.CountersDB)")
-		return false
-	}
-	rclientDBNum[db.ConfigDB] = getDbClient(int(db.ConfigDB))
-	if rclientDBNum[db.ConfigDB] == nil {
-		fmt.Printf("error in getDbClient(int(db.ConfigDB)")
-		return false
-	}
-	rclient = rclientDBNum[db.ConfigDB]
+	testDBNums := []db.DBNum{db.CountersDB, db.ConfigDB, db.ApplDB, db.StateDB}
+	rclientDBByNs = make(map[string]map[db.DBNum]*redis.Client)
+	rclientNs = make(map[string]*redis.Client)
 
-	rclientDBNum[db.ApplDB] = getDbClient(int(db.ApplDB))
-	if rclientDBNum[db.ApplDB] == nil {
-		fmt.Printf("error in getDbClient(int(db.ApplDB)")
-		return false
+	for _, ns := range mdbNames {
+		rclientDBByNs[ns] = make(map[db.DBNum]*redis.Client)
+		for _, dbNum := range testDBNums {
+			client := redisClientForMdb(ns, dbNum)
+			if client == nil {
+				fmt.Printf("error in redisClientForMdb(%q, %v)", ns, dbNum)
+				return false
+			}
+			if _, err := client.Ping().Result(); err != nil {
+				fmt.Printf("failed to connect to redis ns=%q db=%v: %v", ns, dbNum, err)
+				return false
+			}
+			rclientDBByNs[ns][dbNum] = client
+		}
+		rclientNs[ns] = rclientDBByNs[ns][db.ConfigDB]
 	}
 
+	rclientDBNum = rclientDBByNs[hostDBName]
+	rclient = rclientNs[hostDBName]
 	return true
 }
 
@@ -175,24 +212,30 @@ func setup() error {
 func teardown() error {
 	fmt.Println("----- Performing teardown -----")
 	clearDb()
-	for dbNum := range rclientDBNum {
-		if rclientDBNum[dbNum] != nil {
-			db.CloseRedisClient(rclientDBNum[dbNum])
+	for ns, byNum := range rclientDBByNs {
+		for dbNum, client := range byNum {
+			if client != nil {
+				db.CloseRedisClient(client)
+			}
+			rclientDBByNs[ns][dbNum] = nil
 		}
 	}
 
 	return nil
 }
 
-func loadDB(dbNum db.DBNum, mpi map[string]interface{}) {
-	client := rclientDBNum[dbNum]
+func loadDBWithClient(client *redis.Client, dbNum db.DBNum, mpi map[string]interface{}) {
+	if client == nil {
+		fmt.Printf("loadDB: nil redis client for db %v", dbNum)
+		return
+	}
 	opts := getDBOptions(dbNum, false)
 	for key, fv := range mpi {
 		switch fv.(type) {
 		case map[string]interface{}:
 			for subKey, subValue := range fv.(map[string]interface{}) {
 				newKey := key + opts.KeySeparator + subKey
-				_, err := client.HMSet(context.Background(), newKey, subValue.(map[string]interface{})).Result()
+				_, err := client.HMSet(newKey, subValue.(map[string]interface{})).Result()
 
 				if err != nil {
 					fmt.Printf("Invalid data for db: %v : %v %v", newKey, subValue, err)
@@ -205,15 +248,31 @@ func loadDB(dbNum db.DBNum, mpi map[string]interface{}) {
 	}
 }
 
-func unloadDB(dbNum db.DBNum, mpi map[string]interface{}) {
-	client := rclientDBNum[dbNum]
+func loadDB(a interface{}, b interface{}, c ...map[string]interface{}) {
+	switch v := a.(type) {
+	case string:
+		mdbName := v
+		dbNum := b.(db.DBNum)
+		loadDBWithClient(rclientDBByNs[mdbName][dbNum], dbNum, c[0])
+	case db.DBNum:
+		loadDBWithClient(rclientDBNum[v], v, b.(map[string]interface{}))
+	default:
+		fmt.Printf("loadDB: unsupported first argument type %T", a)
+	}
+}
+
+func unloadDBWithClient(client *redis.Client, dbNum db.DBNum, mpi map[string]interface{}) {
+	if client == nil {
+		fmt.Printf("unloadDB: nil redis client for db %v", dbNum)
+		return
+	}
 	opts := getDBOptions(dbNum, false)
 	for key, fv := range mpi {
 		switch fv.(type) {
 		case map[string]interface{}:
 			for subKey, subValue := range fv.(map[string]interface{}) {
 				newKey := key + opts.KeySeparator + subKey
-				_, err := client.Del(context.Background(), newKey).Result()
+				_, err := client.Del(newKey).Result()
 
 				if err != nil {
 					fmt.Printf("Invalid data for db: %v : %v %v", newKey, subValue, err)
@@ -225,13 +284,21 @@ func unloadDB(dbNum db.DBNum, mpi map[string]interface{}) {
 		}
 	}
 
+}
+
+func unloadDB(a interface{}, b interface{}, c ...map[string]interface{}) {
+	switch v := a.(type) {
+	case string:
+		mdbName := v
+		dbNum := b.(db.DBNum)
+		unloadDBWithClient(rclientDBByNs[mdbName][dbNum], dbNum, c[0])
+	case db.DBNum:
+		unloadDBWithClient(rclientDBNum[v], v, b.(map[string]interface{}))
+	default:
+		fmt.Printf("unloadDB: unsupported first argument type %T", a)
+	}
 }
 
 func getDbClient(dbNum int) *redis.Client {
-	rclient := db.TransactionalRedisClient(db.DBNum(dbNum))
-	_, err := rclient.Ping(context.Background()).Result()
-	if err != nil {
-		fmt.Printf("failed to connect to redis server %v", err)
-	}
-	return rclient
+	return redisClientForMdb(hostDBName, db.DBNum(dbNum))
 }
