@@ -20,12 +20,13 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/redis/go-redis/v9"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -176,7 +177,7 @@ func NewRedisConfigDBClient() (*redis.Client, error) {
 	if client == nil {
 		return nil, fmt.Errorf("Cannot create Redis Config DB client.")
 	}
-	if _, err := client.Ping().Result(); err != nil {
+	if _, err := client.Ping(context.Background()).Result(); err != nil {
 		return nil, err
 	}
 	return client, nil
@@ -582,7 +583,7 @@ func readRedis(key string, multiDbName string) (map[string]string, error) {
 		PoolSize:    1,
 	})
 
-	fields, e := client.HGetAll(key).Result()
+	fields, e := client.HGetAll(context.Background(), key).Result()
 
 	client.Close()
 

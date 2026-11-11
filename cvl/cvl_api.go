@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+
 	"runtime"
 	"strings"
 	"sync"
@@ -32,13 +33,13 @@ import (
 	cmn "github.com/Azure/sonic-mgmt-common/cvl/common"
 	custv "github.com/Azure/sonic-mgmt-common/cvl/custom_validation"
 	"github.com/Azure/sonic-mgmt-common/cvl/internal/yparser"
-	"github.com/antchfx/xmlquery"
 	"github.com/go-redis/redis/v7"
 	"github.com/google/go-cmp/cmp"
-	"github.com/philopon/go-toposort"
+	toposort "github.com/philopon/go-toposort"
 
 	//lint:ignore ST1001 This is safe to dot import for util package
 	. "github.com/Azure/sonic-mgmt-common/cvl/internal/util"
+	"github.com/antchfx/xmlquery"
 )
 
 var cvlErrorMap = map[CVLRetCode]string{

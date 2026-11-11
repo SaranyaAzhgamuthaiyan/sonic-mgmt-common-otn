@@ -61,11 +61,7 @@ func getChannelName() {
 }
 
 func openPubSubRpcDB(t *testing.T, nm string) *DB {
-	/*<<<<<<< HEAD
-	d, e := PubSubRpcDB(Options{DBNo: LogLevelDB, MDBName: hostDBName}, nm)*/
-	//=======
 	d, e := PubSubRpcDB(Options{DBNo: LogLevelDB, MDBName: hostDBName, ForceNewRedisConnection: true}, nm)
-	//>>>>>>> upstream/otn-dev
 
 	if (d == nil) || (e != nil) {
 		t.Fatalf("PubSubRpcDB() fails e = %v", e)

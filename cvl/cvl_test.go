@@ -213,7 +213,7 @@ func loadConfigDB(rclient *redis.Client, mpi map[string]interface{}) {
 		case map[string]interface{}:
 			for subKey, subValue := range fv.(map[string]interface{}) {
 				newKey := key + getSeparator() + subKey
-				_, err := rclient.HSet(newKey, subValue.(map[string]interface{})).Result()
+				_, err := rclient.HMSet(newKey, subValue.(map[string]interface{})).Result()
 
 				if err != nil {
 					fmt.Printf("Invalid data for db: %v : %v %v", newKey, subValue, err)
@@ -322,11 +322,6 @@ func clearDb() {
 /* Setup before starting of test. */
 func TestMain(m *testing.M) {
 
-	rclient = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6381", // Change this to your desired port (e.g., "localhost:6380")
-		Password: "",               // No password set
-		DB:       0,                // Default DB
-	})
 	redisAlreadyRunning := false
 	pidOfRedis, err := exec.Command("pidof", "redis-server").Output()
 	if err == nil && string(pidOfRedis) != "\n" {

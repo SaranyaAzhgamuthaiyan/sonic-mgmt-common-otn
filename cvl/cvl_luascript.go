@@ -22,19 +22,28 @@ package cvl
 import (
 	"errors"
 
+	"github.com/Azure/sonic-mgmt-common/cvl/internal/util"
 	"github.com/go-redis/redis/v7"
-	//lint:ignore ST1001 This is safe to dot import for util package
 )
 
-// RunLua is a temporary API to run a named lua script in ConfigDb. Script name
-// can be one of "count_entries" or "filter_entries".
+// RunLua runs a named script ("count_entries" or "filter_entries") on the
+// CONFIG_DB instance for mdbName. The Redis client stays inside CVL
+// (go-redis v7); callers pass only the namespace.
 // TODO move the script definitions to DBAL and remove this API
-func RunLua(redisClient *redis.Client, name string, args ...interface{}) (interface{}, error) {
+func RunLua(mdbName string, name string, args ...interface{}) (interface{}, error) {
 	script, ok := luaScripts[name]
 	if !ok || script == nil {
 		return nil, errors.New("unknown script: " + name)
 	}
-	return script.Run(redisClient, []string{}, args...).Result()
+	if mdbName == "" {
+		mdbName = "host"
+	}
+	client := util.NewDbClient("CONFIG_DB." + mdbName)
+	if client == nil {
+		return nil, errors.New("RunLua: redis client is nil")
+	}
+	defer client.Close()
+	return script.Run(client, []string{}, args...).Result()
 }
 
 // Redis server side script

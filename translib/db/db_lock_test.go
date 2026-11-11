@@ -20,6 +20,7 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -55,7 +56,7 @@ func clearLockRedis(dbName string) error {
 		return err
 	}
 	defer CloseRedisClient(client)
-	return client.Del(lockTableKey).Err()
+	return client.Del(context.Background(), lockTableKey).Err()
 }
 
 func clearLockRedisForTest(t *testing.T, dbName string) {
@@ -71,7 +72,7 @@ func setLockFieldsRedis(dbName string, val Value) error {
 	}
 	defer CloseRedisClient(client)
 	for field, v := range val.Field {
-		if err := client.HSet(lockTableKey, field, v).Err(); err != nil {
+		if err := client.HSet(context.Background(), lockTableKey, field, v).Err(); err != nil {
 			return err
 		}
 	}

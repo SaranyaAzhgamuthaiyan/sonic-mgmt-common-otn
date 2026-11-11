@@ -23,12 +23,14 @@ Package db implements a wrapper over the go-redis/redis.
 package db
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"strings"
 
 	"github.com/Azure/sonic-mgmt-common/translib/tlerr"
 	"github.com/golang/glog"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
@@ -130,6 +132,11 @@ func iSubscribeDB(opt Options, skeys []*SKey, handler interface{}) (*DB, error) 
 		return nil, tlerr.TranslibDBNotSupported{}
 	}
 
+	if glog.V(3) {
+		glog.Info("SubscribeDB: Begin: opt: ", opt,
+			" skeys: ", skeys, " handler: ", handler)
+	}
+
 	patterns := make([]string, 0, len(skeys))
 	patMap := make(map[string]([]int), len(skeys))
 	var s string
@@ -143,7 +150,6 @@ func iSubscribeDB(opt Options, skeys []*SKey, handler interface{}) (*DB, error) 
 	opt.ForceNewRedisConnection = false
 
 	// NewDB
-
 	d, e := NewDB(opt)
 
 	if d.client == nil {
@@ -152,7 +158,7 @@ func iSubscribeDB(opt Options, skeys []*SKey, handler interface{}) (*DB, error) 
 
 	// Make sure that the DB is configured for key space notifications
 	// Optimize with LUA scripts to atomically add "Kgshxe".
-	s, e = d.client.ConfigSet("notify-keyspace-events", "AKE").Result()
+	s, e = d.client.ConfigSet(context.Background(), "notify-keyspace-events", "AKE").Result()
 
 	if e != nil {
 		glog.Error("SubscribeDB: ConfigSet(): e: ", e, " s: ", s)
@@ -171,7 +177,7 @@ func iSubscribeDB(opt Options, skeys []*SKey, handler interface{}) (*DB, error) 
 
 	glog.Info("SubscribeDB: patterns: ", patterns)
 
-	d.sPubSub = d.client.PSubscribe(patterns[:]...)
+	d.sPubSub = d.client.PSubscribe(context.Background(), patterns[:]...)
 
 	if d.sPubSub == nil {
 		glog.Error("SubscribeDB: PSubscribe() nil: pats: ", patterns)
@@ -182,7 +188,7 @@ func iSubscribeDB(opt Options, skeys []*SKey, handler interface{}) (*DB, error) 
 	d.sOnCCacheDB = d.Opts.SDB
 
 	// Wait for confirmation, of channel creation
-	_, e = d.sPubSub.Receive()
+	_, e = d.sPubSub.Receive(context.Background())
 
 	if e != nil {
 		glog.Error("SubscribeDB: Receive() fails: e: ", e)
@@ -196,7 +202,7 @@ func iSubscribeDB(opt Options, skeys []*SKey, handler interface{}) (*DB, error) 
 	// Start a goroutine to read messages and call handler.
 	go func() {
 		maxchandepth := 0
-		pschan := d.sPubSub.Channel()
+		pschan := d.sPubSub.Channel(redis.WithChannelSize(subscriptionChannelSize))
 		for msg := range pschan {
 			glog.V(3).Info("SubscribeDB: msg: ", msg)
 			curdepth := len(pschan)
@@ -235,6 +241,7 @@ func iSubscribeDB(opt Options, skeys []*SKey, handler interface{}) (*DB, error) 
 		if !d.sCIP {
 			sEvent = SEventErr
 		}
+		glog.Info("SubscribeDB: SEventClose|Err: ", sEvent)
 		if isSA {
 			hFuncSA(d, RunningConfigNotif, "", &SKey{}, &Key{}, sEvent)
 		} else {

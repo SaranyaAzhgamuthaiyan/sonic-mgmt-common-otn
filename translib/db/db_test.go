@@ -20,6 +20,7 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -29,7 +30,7 @@ import (
 	"time"
 
 	"github.com/Azure/sonic-mgmt-common/internal/mdb"
-	"github.com/go-redis/redis/v7"
+	"github.com/redis/go-redis/v9"
 )
 
 var dbConfig = `
@@ -148,10 +149,10 @@ func newOnCDB(dBNum DBNum) (*DB, error) {
 // whne the test case ends.
 func setupTestData(t *testing.T, redis *redis.Client, data map[string]map[string]interface{}) {
 	keys := make([]string, 0, len(data))
-	t.Cleanup(func() { redis.Del(keys...) })
+	t.Cleanup(func() { redis.Del(context.Background(), keys...) })
 	for k, v := range data {
 		keys = append(keys, k)
-		if _, err := redis.HMSet(k, v).Result(); err != nil {
+		if _, err := redis.HMSet(context.Background(), k, v).Result(); err != nil {
 			t.Fatalf("HMSET %s failed; err=%v", k, err)
 		}
 	}
@@ -1949,7 +1950,7 @@ func TestCloseRedisClient(t *testing.T) {
 
 			if test.client != nil {
 				// The client should only be closed for transactional clients
-				_, err := test.client.Ping().Result()
+				_, err := test.client.Ping(context.Background()).Result()
 				/* This if case is added because connections close status changes based on usePools"*/
 				if (test.name == "ValidRedisClient") && (*usePools == false) {
 					if (err == nil) == !test.closed {
@@ -2024,7 +2025,7 @@ func TestConnectionPoolDisable(t *testing.T) {
 	client := RedisClient(ConfigDB)
 	defer CloseRedisClient(client)
 
-	if err := client.Ping().Err(); err != nil {
+	if err := client.Ping(context.Background()).Err(); err != nil {
 		t.Fatalf("Failed to create client: %v", err)
 	}
 	if ps := client.Options().PoolSize; ps != 1 {
@@ -2277,7 +2278,7 @@ func TestRedisClientPoolExhaustion(t *testing.T) {
 
 	rc := createRedisClient(ConfigDB, testPoolSize)
 	defer rc.Close()
-	if err := rc.HSet("REDIS_TEST_TABLE|test", map[string]interface{}{"test_field": "test_value"}).Err(); err != nil {
+	if err := rc.HSet(context.Background(), "REDIS_TEST_TABLE|test", map[string]interface{}{"test_field": "test_value"}).Err(); err != nil {
 		t.Fatalf("Failed to set test data: %v", err)
 	}
 
@@ -2286,7 +2287,7 @@ func TestRedisClientPoolExhaustion(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			entry, err := rc.HGetAll("REDIS_TEST_TABLE|test").Result()
+			entry, err := rc.HGetAll(context.Background(), "REDIS_TEST_TABLE|test").Result()
 			if err != nil {
 				t.Fatalf("Failed to read the test table: %v", err)
 			}
