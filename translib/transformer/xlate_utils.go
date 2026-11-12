@@ -968,7 +968,7 @@ func xpathKeyExtractForGet(d *db.DB, ygRoot *ygot.GoStruct, oper Operation, path
 		curPathWithKey = strings.Join(pathList[:tblKeyInfo.pathIdx], "/")
 		pathIdx = tblKeyInfo.pathIdx
 		childListNodePathIdx = tblKeyInfo.childListNodePathIdx
-		log.V(5).Infof("xpathKeyExtractForGet: found key xfmr: %v in cache; retData.xpath: %v; pathIdx: %v;"+
+		log.V(5).Infof("xpathKeyExtractForGet: found key xfmr: %v in cache;  retData.xpath: %v; pathIdx: %v;"+
 			" childListNodePathIdx: %v; curPathWithKey: %v", ygXpathInfo.xfmrKey, retData.xpath, pathIdx, childListNodePathIdx, curPathWithKey)
 	} else {
 		for len(ygXpathInfo.xfmrKey) == 0 {

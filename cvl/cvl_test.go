@@ -402,7 +402,6 @@ func init() {
 			panic(err)
 		}
 	}
-
 }
 
 // Test Initialize() API
@@ -2328,6 +2327,7 @@ func TestValidateEditConfig_Create_DepData_In_MultiSess(t *testing.T) {
 			t.Errorf("Config Validation failed -- error details %v", cvlErrInfo)
 		}
 	}
+
 }
 
 func TestValidateEditConfig_Create_DepData_From_Redis_Negative11(t *testing.T) {

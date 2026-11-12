@@ -334,7 +334,6 @@ func (ne *notificationEvent) DiffAndMergeOnChangeCache() (*apis.EntryDiff, error
 		nInfo = n[0] // Pick any one nInfo from notificationGroup to read dbno and table spec
 		break
 	}
-
 	if nInfo == nil {
 		return nil, nil
 	}

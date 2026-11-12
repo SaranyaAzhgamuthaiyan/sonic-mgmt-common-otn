@@ -511,12 +511,14 @@ func Update(req SetRequest) (SetResponse, error) {
 	log.Info("Update request received with payload =", string(payload))
 
 	app, appInfo, err := getAppModule(path, req.ClientVersion)
+
 	if err != nil {
 		resp.ErrSrc = ProtoErr
 		return resp, err
 	}
 
 	err = appInitialize(app, appInfo, path, &payload, nil, UPDATE)
+
 	if err != nil {
 		resp.ErrSrc = AppErr
 		return resp, err
@@ -740,6 +742,7 @@ func Replace(req SetRequest) (SetResponse, error) {
 	}
 
 	app, appInfo, err := getAppModule(path, req.ClientVersion)
+
 	if err != nil {
 		resp.ErrSrc = ProtoErr
 		return resp, err
@@ -973,6 +976,7 @@ func Delete(req SetRequest) (SetResponse, error) {
 	log.Info("Delete request received with path =", path)
 
 	app, appInfo, err := getAppModule(path, req.ClientVersion)
+
 	if err != nil {
 		resp.ErrSrc = ProtoErr
 		return resp, err
@@ -980,6 +984,7 @@ func Delete(req SetRequest) (SetResponse, error) {
 
 	opts := appOptions{deleteEmptyEntry: req.DeleteEmptyEntry}
 	err = appInitialize(app, appInfo, path, nil, &opts, DELETE)
+
 	if err != nil {
 		resp.ErrSrc = AppErr
 		return resp, err
@@ -1430,7 +1435,6 @@ func Bulk(req BulkRequest) (BulkResponse, error) {
 			errSrc = ProtoErr
 			goto BulkError
 		}
-
 		if operation == DELETE {
 			opts := appOptions{deleteEmptyEntry: req.Request[i].Entry.DeleteEmptyEntry}
 			err = appInitialize(app, appInfo, path, nil, &opts, operation)
@@ -1893,7 +1897,6 @@ func appInitialize(app *appInterface, appInfo *appInfo, path string, payload *[]
 	} else {
 		reqBinder := getRequestBinder(&path, payload, opCode, &(appInfo.ygotRootType))
 		ygotStruct, ygotTarget, err := reqBinder.unMarshall()
-
 		if err != nil {
 			log.Info("Error in request binding: ", err)
 			return err

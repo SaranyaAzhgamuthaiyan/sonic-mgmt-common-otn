@@ -701,7 +701,6 @@ func (app *CommonApp) processCommon(d *db.DB, opcode int) error {
 
 	// Handle delete first if any available
 	if _, ok := app.cmnAppTableMap[DELETE][db.ConfigDB]; ok {
-
 		err = app.cmnAppDelDbOpn(d, DELETE, app.cmnAppTableMap[DELETE][db.ConfigDB])
 		if err != nil {
 			log.Info("Process delete fail. cmnAppDelDbOpn error:", err)
@@ -1308,7 +1307,6 @@ func (app *CommonApp) handleChildDeleteForOcReplaceAndDelete(d *db.DB, sortedDel
 					}
 				}
 			}
-
 		}
 	}
 	return err

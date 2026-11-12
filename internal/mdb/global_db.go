@@ -16,9 +16,9 @@ type DbGlobal struct {
 
 // DbInclude is one entry in database_global.json INCLUDES.
 type DbInclude struct {
-	Include        string `json:"include"`
-	Namespace      string `json:"namespace"`
-	ContainerName  string `json:"container_name"`
+	Include       string `json:"include"`
+	Namespace     string `json:"namespace"`
+	ContainerName string `json:"container_name"`
 }
 
 // ConfigPathsForInit returns namespace → database_config.json paths for translib/CVL init.
