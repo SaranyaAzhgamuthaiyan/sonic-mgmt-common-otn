@@ -513,7 +513,7 @@ var oa_name_get_namespace_xfmr GetNamespaceFunc = func(inParams XfmrParams) ([]N
 	log.Infof("oa_name_get_namespace_xfmr: key: %v", key)
 
 	if len(key) > 0 && key != "*" {
-		dbName := db.GetMDBNameFromEntity(key)
+		dbName := db.GetMDBNameFromOtnOpticalEntity(key)
 		log.Infof("oa_name_get_namespace_xfmr: dbName: %v", dbName)
 
 		var raw interface{}
@@ -575,7 +575,7 @@ var oa_name_get_namespace_xfmr GetNamespaceFunc = func(inParams XfmrParams) ([]N
 
 			for _, key := range val.MapKeys() {
 				entity := val.MapIndex(key).Interface()
-				dbName := db.GetMDBNameFromEntity(key.String())
+				dbName := db.GetMDBNameFromOtnOpticalEntity(key.String())
 
 				ygotStruct, ok := entity.(ygot.ValidatedGoStruct)
 				if !ok {
