@@ -105,13 +105,13 @@ func TestLock(t *testing.T) {
 // returns a TranslibDBLock with given DBLockType code
 func testLock(lockToken string, expError tlerr.DBLockType) func(*testing.T) {
 	return func(t *testing.T) {
-		fVal := Value{Field: map[string]string{legacyConfigDBLock: lockToken}}
+		fVal := Value{Field: map[string]string{configDBLock: lockToken}}
 		setupKey(t, fTs, fKey, fVal, hostDBName)
 		t.Cleanup(func() {
 			clearLockRedis(hostDBName)
 			cdbLock[hostDBName] = nil
 		})
-		err := (&LockStruct{Name: legacyConfigDBLock, Id: testSTok,
+		err := (&LockStruct{Name: configDBLock, Id: testSTok,
 			lockStruct: lockStruct{comm: execName}}).tryLock(hostDBName)
 
 		if e, ok := err.(tlerr.TranslibDBLock); !ok || e.Type != expError {
@@ -129,7 +129,7 @@ func TestLockUnlock(t *testing.T) {
 		t.Run("LockAndUnlock_"+dbName, func(t *testing.T) {
 			clearLockRedisForTest(t, dbName)
 			t.Cleanup(func() { clearLockRedis(dbName); cdbLock[dbName] = nil })
-			ls := &LockStruct{Name: legacyConfigDBLock, Id: testSTok,
+			ls := &LockStruct{Name: configDBLock, Id: testSTok,
 				lockStruct: lockStruct{comm: execName}}
 			err = ls.tryLock(dbName)
 			if err != nil {
@@ -183,7 +183,7 @@ func TestLockUnlockNonExisting(t *testing.T) {
 
 		t.Run("LockUnlockNonExisting_"+dbName, func(t *testing.T) {
 			// Unlock it. -- Should Fail.
-			ls := &LockStruct{Name: legacyConfigDBLock, Id: testSTok,
+			ls := &LockStruct{Name: configDBLock, Id: testSTok,
 				lockStruct: lockStruct{comm: execName}}
 			err = ls.unlock(dbName)
 			if _, ok := err.(tlerr.TranslibDBNotSupported); !ok {
@@ -202,12 +202,12 @@ func TestLockNotOurLockUnlock(t *testing.T) {
 	for idx, dbName := range GetMultiDbNames() {
 		t.Run("LockNotOurLockUnlock_"+dbName, func(t *testing.T) {
 			fVal := Value{Field: map[string]string{
-				legacyConfigDBLock: execName + ":" + testSTok + strconv.Itoa(idx)}}
+				configDBLock: execName + ":" + testSTok + strconv.Itoa(idx)}}
 			//                                            ^^^ Somebody else's lock
 			setupKey(t, fTs, fKey, fVal, dbName)
 
 			// Unlock it. -- Should Fail.
-			ls := &LockStruct{Name: legacyConfigDBLock, Id: testSTok,
+			ls := &LockStruct{Name: configDBLock, Id: testSTok,
 				lockStruct: lockStruct{comm: execName}}
 			err = ls.unlock(dbName)
 			if _, ok := err.(tlerr.TranslibDBNotSupported); !ok {
@@ -234,12 +234,12 @@ func TestLockClearLock(t *testing.T) {
 	t.Cleanup(func() { clearLockRedis(hostDBName); cdbLock[hostDBName] = nil })
 
 	fVal := Value{Field: map[string]string{
-		legacyConfigDBLock: execName + ":" + testSTok + "0"}}
+		configDBLock: execName + ":" + testSTok + "0"}}
 	//                                            ^^^ Somebody else's lock
 	setupKey(t, fTs, fKey, fVal, hostDBName)
 
 	// Clear it. -- Should Work.
-	ls := &LockStruct{Name: legacyConfigDBLock, Id: "*",
+	ls := &LockStruct{Name: configDBLock, Id: "*",
 		lockStruct: lockStruct{comm: execName, locked: true}}
 	err = ls.unlock(hostDBName)
 	if err != nil {
@@ -323,7 +323,7 @@ func TestLockConfigDBClearLock(t *testing.T) {
 	for _, dbName := range GetMultiDbNames() {
 		t.Run("LockConfigDBClearLock_"+dbName, func(t *testing.T) {
 			fVal := Value{Field: map[string]string{
-				legacyConfigDBLock: execName + ":" + testSTok + "0"}}
+				configDBLock: execName + ":" + testSTok + "0"}}
 			//                                            ^^^ Somebody else's lock
 			setupKey(t, fTs, fKey, fVal, dbName)
 

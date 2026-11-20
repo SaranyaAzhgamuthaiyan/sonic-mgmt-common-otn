@@ -198,6 +198,15 @@ var cvg cvlGlobalSessionType
 // Single redis client for validation
 var redisClient *redis.Client
 
+// dbAccessMDBName returns the namespace of dbAccess when it provides one
+// (optional GetMDBName method); otherwise returns "".
+func dbAccessMDBName(dbAccess cmn.DBAccess) string {
+	if n, ok := dbAccess.(interface{ GetMDBName() string }); ok {
+		return n.GetMDBName()
+	}
+	return ""
+}
+
 // Stores important model info
 var modelInfo modelDataInfo
 
@@ -1126,7 +1135,7 @@ func (c *CVL) doCustomValidation(node *xmlquery.Node,
 			YCur:      node,
 			SessCache: &(c.custvCache),
 			RClient:   c.dbAccess,
-			NameSpace: c.dbAccess.GetMDBName()}
+			NameSpace: dbAccessMDBName(c.dbAccess)}
 		for _, custFunction := range custFuncs {
 			CVL_LOG(INFO_TRACE, "Calling custom validation function %s", custFunction)
 			errObj := custv.InvokeCustomValidation(&custv.CustomValidation{}, custFunction, pCustv)

@@ -619,24 +619,11 @@ func getDBOptions(dbNo db.DBNum, opts ...func(*db.Options)) db.Options {
 	var opt db.Options
 	separator := ""
 
-	if multiDbsConfigMap != nil {
-		dbName := db.GetDBInstName(dbNo)
-		dbList, ok := multiDbsConfigMap["DATABASES"]
-		if ok {
-			dbSep, ok := dbList[dbName].(map[string]interface{})["separator"]
-			if ok {
-				separator = dbSep.(string)
-			}
-		}
-	}
-
-	if separator == "" {
-		switch dbNo {
-		case db.ApplDB, db.CountersDB, db.ErrorDB, db.FlexCounterDB, db.AsicDB, db.LogLevelDB:
-			separator = ":"
-		case db.SnmpDB, db.ConfigDB, db.StateDB, db.EventDB:
-			separator = "|"
-		}
+	switch dbNo {
+	case db.ApplDB, db.CountersDB, db.ErrorDB, db.FlexCounterDB, db.AsicDB, db.LogLevelDB:
+		separator = ":"
+	case db.SnmpDB, db.ConfigDB, db.StateDB, db.EventDB:
+		separator = "|"
 	}
 	opt = getDBOptionsWithSeparator(dbNo, "", separator, separator)
 	for _, setopt := range opts {

@@ -37,12 +37,11 @@ import (
 )
 
 const (
-	configDBLock       string = "ConfigDBLock"
-	legacyConfigDBLock string = "config_db_lock"
-	lockTable          string = "LOCK"
-	lockKey            string = "translib"
-	lockTableKey       string = lockTable + "|" + lockKey
-	noSessionToken     string = "0-0"
+	configDBLock   string = "config_db_lock"
+	lockTable      string = "LOCK"
+	lockKey        string = "translib"
+	lockTableKey   string = lockTable + "|" + lockKey
+	noSessionToken string = "0-0"
 
 	tryLockAttempt int           = 4
 	tryLockPause   time.Duration = 200
@@ -286,9 +285,6 @@ func ConfigDBClearLock() error {
 	multiDbNames := GetMultiDbNames()
 	for _, multiDbName := range multiDbNames {
 		if err = clearLockField(multiDbName, configDBLock); err != nil {
-			break
-		}
-		if err = clearLockField(multiDbName, legacyConfigDBLock); err != nil {
 			break
 		}
 		cdbLock[multiDbName] = nil

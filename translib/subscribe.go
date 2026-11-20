@@ -350,7 +350,7 @@ func IsSubscribeSupported(req IsSubscribeRequest) ([]*IsSubscribeResponse, error
 
 	defer closeAllMdbs(mdb)
 
-	for i, p := range req.Paths {
+	for i, p := range paths {
 		dbNames, err := fetchDbNames(p.Path, req.ClientVersion)
 		log.Infof("fetchDbNames returned:%v", dbNames)
 		if dbNames == nil {
@@ -459,7 +459,6 @@ func startDBSubscribe(opt db.Options, nGroups map[db.TableSpec]*notificationGrou
 
 		sKeyList = append(sKeyList, skeys...)
 
-		log.Info("Calling RegisterTableForOnChangeCaching..")
 		d.RegisterTableForOnChangeCaching(&tSpec)
 	}
 
@@ -522,7 +521,6 @@ func (sc *subscribeContext) translateAndAddPath(path string, mode NotificationTy
 	// Group nInfo by table and key pattern for OnChange.
 	// Required for registering db subscriptions.
 	if mode == OnChange {
-		log.Infof("Mode: ON CHANGE")
 		if sc.dbNInfos == nil {
 			sc.dbNInfos = make(map[db.DBNum]map[db.TableSpec]*notificationGroup)
 		}
@@ -539,7 +537,6 @@ func (sc *subscribeContext) translateAndAddPath(path string, mode NotificationTy
 
 func startSubscribe(sCtxs []*subscribeContext) error {
 	var err error
-	log.Info("In startSubscribe")
 
 	sMutex.Lock()
 	defer sMutex.Unlock()

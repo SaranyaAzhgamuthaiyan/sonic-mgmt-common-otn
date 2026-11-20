@@ -328,7 +328,6 @@ func (ne *notificationEvent) process() {
 // DiffAndMergeOnChangeCache Compare modified entry with cached entry and
 // return modified fields. Also update the cache with changes.
 func (ne *notificationEvent) DiffAndMergeOnChangeCache() (*apis.EntryDiff, error) {
-	log.Infof("In DiffAndMergeOnChangeCache:")
 	var nInfo *notificationInfo
 	for _, n := range ne.nGrup.nInfos {
 		nInfo = n[0] // Pick any one nInfo from notificationGroup to read dbno and table spec

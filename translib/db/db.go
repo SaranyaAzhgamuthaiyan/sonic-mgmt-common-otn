@@ -188,7 +188,16 @@ func (dbNo DBNum) String() string {
 }
 
 // ID returns the redis db id for this DBNum
-func (dbNo DBNum) ID(MDBName string) int {
+func (dbNo DBNum) ID() int {
+	name := getDBInstName(dbNo)
+	if len(name) == 0 {
+		panic("Invalid DBNum " + fmt.Sprintf("%d", dbNo))
+	}
+	return getDbId(name)
+}
+
+// IDForMDB returns the redis db id for this DBNum in the given namespace.
+func (dbNo DBNum) IDForMDB(MDBName string) int {
 	name := getDBInstName(dbNo)
 	if len(name) == 0 {
 		panic("Invalid DBNum " + fmt.Sprintf("%d", dbNo))

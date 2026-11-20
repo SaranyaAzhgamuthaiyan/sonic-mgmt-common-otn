@@ -1483,7 +1483,7 @@ func yangDataFill(inParamsForGet xlateFromDbParams, isOcMdl bool) error {
 	xpath := inParamsForGet.xpath
 	var chldUri string
 
-	log.Infof("yangDataFill: uri: %v; parent obj: %v; inParamsForGet.relUri: %v; xpath: %v",
+	log.V(5).Infof("yangDataFill: uri: %v; parent obj: %v; inParamsForGet.relUri: %v; xpath: %v",
 		inParamsForGet.uri, reflect.TypeOf(*inParamsForGet.ygParentObj), inParamsForGet.relUri, xpath)
 
 	yangNode, ok := xYangSpecMap[xpath]
@@ -1511,7 +1511,7 @@ func yangDataFill(inParamsForGet xlateFromDbParams, isOcMdl bool) error {
 				inParamsForGet.ygSchema = ygotCtx.trgtYgSchema
 				inParamsForGet.relUri = ""
 			}
-			log.Infof("yangDataFill: after uri marshalling: uri: %v; parent obj: %v", inParamsForGet.uri, reflect.TypeOf(*inParamsForGet.ygParentObj))
+			log.V(5).Infof("yangDataFill: after uri marshalling: uri: %v; parent obj: %v", inParamsForGet.uri, reflect.TypeOf(*inParamsForGet.ygParentObj))
 		}
 
 		for yangChldName := range yangNode.yangEntry.Dir {

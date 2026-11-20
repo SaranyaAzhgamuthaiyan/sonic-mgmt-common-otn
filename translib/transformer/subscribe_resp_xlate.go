@@ -387,7 +387,7 @@ func (dbYgXlateInfo *DbYgXlateInfo) handleDbToYangKeyXlate() error {
 		// [ATTENUATOR-1-2-1_OutputPowerTotal 15_pm_current], which
 		// needs to striped and assigned only the actual key value to
 		// dbYgXlateInfo.dbKey.
-		if dbYgXlateInfo.xlateReq.dbNum == 2 && len(dbTableKeyComp) > 0 {
+		if dbYgXlateInfo.xlateReq.dbNum == db.CountersDB {
 			Key := strings.Split(dbTableKeyComp[0], "_")
 			dbYgXlateInfo.dbKey = Key[0]
 		} else {

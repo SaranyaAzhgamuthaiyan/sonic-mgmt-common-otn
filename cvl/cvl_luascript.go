@@ -26,11 +26,21 @@ import (
 	"github.com/go-redis/redis/v7"
 )
 
-// RunLua runs a named script ("count_entries" or "filter_entries") on the
+// RunLua is a temporary API to run a named lua script in ConfigDb. Script name
+// can be one of "count_entries" or "filter_entries".
+// TODO move the script definitions to DBAL and remove this API
+func RunLua(name string, args ...interface{}) (interface{}, error) {
+	script, ok := luaScripts[name]
+	if !ok || script == nil {
+		return nil, errors.New("unknown script: " + name)
+	}
+	return script.Run(redisClient, []string{}, args...).Result()
+}
+
+// RunLuaForMDB runs a named script ("count_entries" or "filter_entries") on the
 // CONFIG_DB instance for mdbName. The Redis client stays inside CVL
 // (go-redis v7); callers pass only the namespace.
-// TODO move the script definitions to DBAL and remove this API
-func RunLua(mdbName string, name string, args ...interface{}) (interface{}, error) {
+func RunLuaForMDB(mdbName string, name string, args ...interface{}) (interface{}, error) {
 	script, ok := luaScripts[name]
 	if !ok || script == nil {
 		return nil, errors.New("unknown script: " + name)
