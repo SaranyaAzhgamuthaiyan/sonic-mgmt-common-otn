@@ -650,15 +650,6 @@ func GetDbPassword(dbName string) string {
 	return password
 }
 
-func getDbPort(dbName string) int {
-	inst := getDbInst(dbName)
-	port, ok := inst["port"]
-	if !ok {
-		panic(fmt.Errorf("'port' is not a valid field"))
-	}
-	return int(port.(float64))
-}
-
 // GetDbTcpAddr Get DB TCP endpoint
 func GetDbTcpAddr(dbName string) string {
 	inst := getDbInst(dbName)
@@ -667,7 +658,12 @@ func GetDbTcpAddr(dbName string) string {
 		panic(fmt.Errorf("'hostname' is not a valid field in %s !",
 			SONIC_DB_CONFIG_FILE))
 	}
-	port := getDbPort(dbName)
+
+	port, ok1 := inst["port"]
+	if !ok1 {
+		panic(fmt.Errorf("'port' is not a valid field in %s !",
+			SONIC_DB_CONFIG_FILE))
+	}
 
 	return fmt.Sprintf("%v:%v", hostname, port)
 }
@@ -770,7 +766,6 @@ func getDBNames(str string) (string, string) {
 }
 
 func getRedisOptions(dbName string) *redis.Options {
-	// dbName = dbName + Namespace
 	var dbNetwork, dbAddr string
 
 	// need to create copy of redisOptions because few attributes

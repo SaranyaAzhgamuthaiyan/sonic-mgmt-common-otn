@@ -315,7 +315,7 @@ func (d *DB) key2redisChannel(ts *TableSpec, key Key) string {
 		glog.Info("key2redisChannel: ", *ts, " key: "+key.String())
 	}
 
-	dbId := strconv.Itoa(d.Opts.DBNo.ID(d.Opts.MDBName))
+	dbId := strconv.Itoa(d.Opts.DBNo.IDForMDB(d.Opts.MDBName))
 	return "__keyspace@" + dbId + "__:" + d.key2redis(ts, key)
 }
 

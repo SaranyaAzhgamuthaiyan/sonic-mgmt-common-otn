@@ -970,7 +970,7 @@ func GetNamespace(uri string, ygotRoot *ygot.GoStruct, body []byte) ([]Namespace
 			log.Warning(errMsg)
 			return nil, errors.New(errMsg)
 		}
-		nameSpaceFunc = spec.namespaceFunc
+		nameSpaceFunc = spec.nsFunc
 	} else {
 		spec, ok := xYangSpecMap[xpath]
 		if !ok {

@@ -22,11 +22,12 @@ package db
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/golang/glog"
 	io "io/ioutil"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/golang/glog"
 )
 
 var multiDbsConfigMap = make(map[string]map[string]interface{})
@@ -180,11 +181,5 @@ func GetMdbConfigMap() map[string]map[string]interface{} {
 // GetDbConfigMap returns the host namespace database_config.json map.
 // Multi-DB callers should use GetMdbConfigMap().
 func GetDbConfigMap() map[string]interface{} {
-	if cfg, ok := multiDbsConfigMap["host"]; ok {
-		return cfg
-	}
-	for _, cfg := range multiDbsConfigMap {
-		return cfg
-	}
-	return make(map[string]interface{})
+	return multiDbsConfigMap["host"]
 }

@@ -528,7 +528,7 @@ func (config *DBStatsConfig) handleReconfigureSignal() error {
 ////////////////////////////////////////////////////////////////////////////////
 
 func (config *DBStatsConfig) readFromDB() error {
-	fields, e := readRedis("TRANSLIB_DB|default", "host")
+	fields, e := readRedis("TRANSLIB_DB|default")
 	if e != nil {
 		config.TimeStats = defaultDBStatsConfig.TimeStats
 		config.TableStats = defaultDBStatsConfig.TableStats
@@ -558,7 +558,12 @@ func (config *DBStatsConfig) readFromDB() error {
 //  Utility Function to read Redis DB                                         //
 ////////////////////////////////////////////////////////////////////////////////
 
-func readRedis(key string, multiDbName string) (map[string]string, error) {
+// readRedis reads a hash from CONFIG_DB of the given namespace (default "host").
+func readRedis(key string, mdbNames ...string) (map[string]string, error) {
+	multiDbName := "host"
+	if len(mdbNames) > 0 {
+		multiDbName = mdbNames[0]
+	}
 
 	ipAddr := DefaultRedisLocalTCPEP
 	dbId := int(ConfigDB)
