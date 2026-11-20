@@ -53,7 +53,7 @@ type notificationEvent struct {
 	mdbName         string
 }
 
-func notificationHandler(d *db.DB, sKey *db.SKey, key *db.Key, event db.SEvent, dbName string) error {
+func notificationHandler(d *db.DB, sKey *db.SKey, key *db.Key, event db.SEvent) error {
 	nid := fmt.Sprintf("n%d", dbNotificationCounter.Next())
 	log.Infof("[%v] notificationHandler: d=%v, table=%v, kayPattern=%v, key=%v, event=%v",
 		nid, dbInfo(d), tableInfo(sKey.Ts), keyInfo(sKey.Key), keyInfo(key), event)
@@ -69,7 +69,7 @@ func notificationHandler(d *db.DB, sKey *db.SKey, key *db.Key, event db.SEvent, 
 				event:   event,
 				key:     key,
 				nGrup:   nGrup,
-				mdbName: dbName,
+				mdbName: d.Opts.MDBName,
 			}
 			n.process()
 		} else {
@@ -334,7 +334,6 @@ func (ne *notificationEvent) DiffAndMergeOnChangeCache() (*apis.EntryDiff, error
 		nInfo = n[0] // Pick any one nInfo from notificationGroup to read dbno and table spec
 		break
 	}
-
 	if nInfo == nil {
 		return nil, nil
 	}

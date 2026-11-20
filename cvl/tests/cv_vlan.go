@@ -20,7 +20,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -63,7 +62,7 @@ func loadConfigDB(rclient *redis.Client, key string, data map[string]string) {
 		dataTmp[k] = v
 	}
 
-	_, err := rclient.HSet(key, dataTmp).Result()
+	_, err := rclient.HMSet(key, dataTmp).Result()
 
 	if err != nil {
 		fmt.Printf("Failed to add for key %s, data %v, err %v", key, data, err)

@@ -171,12 +171,19 @@ func init() {
 func fetchDbNames(path string, clientVer Version) ([]string, error) {
 	var nameSpaces []string
 
-	app, _, err := getAppModule(path, clientVer)
+	app, appInfo, err := getAppModule(path, clientVer)
 	if err != nil {
 		return nil, err
 	}
 
-	namespacePayloads, err := (*app).getNamespace(path)
+	// The app needs the request bound to the path (ygotRoot/body) for
+	// getNamespace to find the namespace of a keyed path, as Get does.
+	opts := appOptions{}
+	if err = appInitialize(app, appInfo, path, nil, &opts, GET); err != nil {
+		return nil, err
+	}
+
+	namespacePayloads, err := getAppNamespace(*app, path)
 
 	if err != nil {
 		return nil, err
@@ -186,8 +193,10 @@ func fetchDbNames(path string, clientVer Version) ([]string, error) {
 	// if keys is not present in xpath of GetRequest.
 	if len(namespacePayloads) == 1 && namespacePayloads[0].Namespace == "*" {
 		nameSpaces = db.GetMultiDbNames()
-	} else {
+	} else if len(namespacePayloads) > 0 {
 		nameSpaces = append(nameSpaces, namespacePayloads[0].Namespace) //Specfic key Get operation.
+	} else {
+		nameSpaces = append(nameSpaces, "host")
 	}
 
 	return nameSpaces, err
@@ -199,14 +208,21 @@ func Subscribe(req SubscribeRequest) error {
 	paths := req.Paths
 	log.Infof("[%v] Subscribe: paths = %v", sid, paths)
 
-	//<<<<<<< HEAD
 	mdb, err := getAllMdbs(withWriteDisable, withOnChange, withForceNewRedisConnection)
-	/*=======
-		dbs, err := getAllDbs(withWriteDisable, withOnChange, withForceNewRedisConnection)
-	>>>>>>> upstream/otn-dev*/
+
 	if err != nil {
 		return err
 	}
+
+	sInfo := &subscribeInfo{
+		id:   sid,
+		q:    req.Q,
+		stop: req.Stop,
+		dbs:  mdb,
+	}
+
+	var sCtxs []*subscribeContext
+	sCtxByName := make(map[string]*subscribeContext)
 
 	for _, path := range paths {
 
@@ -214,25 +230,24 @@ func Subscribe(req SubscribeRequest) error {
 		log.Infof("Subscribe:fetchDbNames returned:%v", dbNames)
 		if dbNames == nil {
 			log.Infof("fetchDbNames returned:%v", err)
+			closeAllMdbs(mdb)
 			return err
 		}
 		for _, dbName := range dbNames {
 
-			sInfo := &subscribeInfo{
-				id:   sid,
-				q:    req.Q,
-				stop: req.Stop,
-				dbs:  mdb,
-			}
-
-			sCtx := subscribeContext{
-				id:      sid,
-				sInfo:   sInfo,
-				dbs:     mdb[dbName],
-				version: req.ClientVersion,
-				session: req.Session,
-				recurse: true,
-				mdbName: dbName,
+			sCtx, exists := sCtxByName[dbName]
+			if !exists {
+				sCtx = &subscribeContext{
+					id:      sid,
+					sInfo:   sInfo,
+					dbs:     mdb[dbName],
+					version: req.ClientVersion,
+					session: req.Session,
+					recurse: true,
+					mdbName: dbName,
+				}
+				sCtxByName[dbName] = sCtx
+				sCtxs = append(sCtxs, sCtx)
 			}
 
 			err = sCtx.translateAndAddPath(path, OnChange)
@@ -240,17 +255,17 @@ func Subscribe(req SubscribeRequest) error {
 				closeAllMdbs(mdb)
 				return err
 			}
-			// Start db subscription and exit. DB objects will be
-			// closed automatically when the subscription ends.
-			err = sCtx.startSubscribe()
-			if err != nil {
-				closeAllMdbs(mdb)
-				return err
-			}
 		}
 	}
 
-	return err
+	if len(sCtxs) == 0 {
+		closeAllMdbs(mdb)
+		return nil
+	}
+
+	// Start db subscription and exit. DB objects will be
+	// closed automatically when the subscription ends.
+	return startSubscribe(sCtxs)
 }
 
 // Stream function streams the value for requested paths through a queue.
@@ -522,35 +537,37 @@ func (sc *subscribeContext) translateAndAddPath(path string, mode NotificationTy
 	return nil
 }
 
-func (sc *subscribeContext) startSubscribe() error {
+func startSubscribe(sCtxs []*subscribeContext) error {
 	var err error
 	log.Info("In startSubscribe")
 
 	sMutex.Lock()
 	defer sMutex.Unlock()
 
-	sInfo := sc.sInfo
+	sInfo := sCtxs[0].sInfo
 
 	stopMap[sInfo.stop] = sInfo
 
-	for dbno, nGroups := range sc.dbNInfos {
-		opt := getDBOptions(dbno, withWriteDisable)
-		opt.MDBName = sc.mdbName
-		err = startDBSubscribe(opt, nGroups, sInfo)
+	for _, sc := range sCtxs {
+		for dbno, nGroups := range sc.dbNInfos {
+			opt := getDBOptions(dbno, withWriteDisable)
+			opt.MDBName = sc.mdbName
+			err = startDBSubscribe(opt, nGroups, sInfo)
 
-		if err != nil {
-			log.Warningf("[%v] db subscribe failed -- %v", sInfo.id, err)
-			cleanup(sInfo.stop)
-			return err
+			if err != nil {
+				log.Warningf("[%v] db subscribe failed -- %v", sInfo.id, err)
+				cleanup(sInfo.stop)
+				return err
+			}
 		}
-	}
 
-	for _, nInfo := range sc.tgtInfos {
-		err := sendInitialUpdate(sInfo, nInfo, sc.mdbName)
-		if err != nil {
-			log.Warningf("[%v] init sync failed -- %v", sInfo.id, err)
-			cleanup(sInfo.stop)
-			return err
+		for _, nInfo := range sc.tgtInfos {
+			err := sendInitialUpdate(sInfo, nInfo, sc.mdbName)
+			if err != nil {
+				log.Warningf("[%v] init sync failed -- %v", sInfo.id, err)
+				cleanup(sInfo.stop)
+				return err
+			}
 		}
 	}
 

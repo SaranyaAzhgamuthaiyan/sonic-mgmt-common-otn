@@ -98,7 +98,6 @@ func runSP(t *testing.T, tc *spTC) {
 
 	ccd, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -211,7 +210,6 @@ func TestSPDeclareSP(t *testing.T) {
 
 	ccd, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",

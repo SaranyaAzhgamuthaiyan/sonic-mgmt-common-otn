@@ -213,7 +213,7 @@ func loadConfigDB(rclient *redis.Client, mpi map[string]interface{}) {
 		case map[string]interface{}:
 			for subKey, subValue := range fv.(map[string]interface{}) {
 				newKey := key + getSeparator() + subKey
-				_, err := rclient.HSet(newKey, subValue.(map[string]interface{})).Result()
+				_, err := rclient.HMSet(newKey, subValue.(map[string]interface{})).Result()
 
 				if err != nil {
 					fmt.Printf("Invalid data for db: %v : %v %v", newKey, subValue, err)
@@ -322,11 +322,6 @@ func clearDb() {
 /* Setup before starting of test. */
 func TestMain(m *testing.M) {
 
-	rclient = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6381", // Change this to your desired port (e.g., "localhost:6380")
-		Password: "",               // No password set
-		DB:       0,                // Default DB
-	})
 	redisAlreadyRunning := false
 	pidOfRedis, err := exec.Command("pidof", "redis-server").Output()
 	if err == nil && string(pidOfRedis) != "\n" {
@@ -407,7 +402,6 @@ func init() {
 			panic(err)
 		}
 	}
-
 }
 
 // Test Initialize() API
@@ -463,10 +457,7 @@ func setupTestData(t *testing.T, dbData map[string]interface{}) {
 }
 
 func getMDBInstance(dbName string) *db.DB {
-	d := configDb[dbName]
-	d.Opts.MDBName = dbName
-
-	return d
+	return configDb[dbName]
 }
 
 /* ValidateEditConfig with user input in file . */
@@ -480,42 +471,40 @@ func TestValidateEditConfig_CfgFile(t *testing.T) {
 	}{
 		{filedescription: "ACL_DATA", cfgDataFile: "testdata/aclrule.json", depDataFile: "testdata/acltable.json", retCode: cvl.CVL_SUCCESS},
 	}
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
 
-		for index, tc := range tests {
-			t.Logf("Running Testcase %d with Description %s", index+1, tc.filedescription)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-			t.Run(tc.filedescription+" "+dbName, func(t *testing.T) {
+	for index, tc := range tests {
+		t.Logf("Running Testcase %d with Description %s", index+1, tc.filedescription)
 
-				jsonEditCfg_Create_DependentMap := convertJsonFileToMap(t, tc.depDataFile)
-				jsonEditCfg_Create_ConfigMap := convertJsonFileToMap(t, tc.cfgDataFile)
+		t.Run(tc.filedescription, func(t *testing.T) {
 
-				cfgData := []cmn.CVLEditConfigData{
-					cmn.CVLEditConfigData{cmn.VALIDATE_ALL, cmn.OP_CREATE, "ACL_TABLE|TestACL1", jsonEditCfg_Create_DependentMap, false},
-				}
+			jsonEditCfg_Create_DependentMap := convertJsonFileToMap(t, tc.depDataFile)
+			jsonEditCfg_Create_ConfigMap := convertJsonFileToMap(t, tc.cfgDataFile)
 
-				cvlErrObj, err := cvSess.ValidateEditConfig(cfgData)
+			cfgData := []cmn.CVLEditConfigData{
+				cmn.CVLEditConfigData{cmn.VALIDATE_ALL, cmn.OP_CREATE, "ACL_TABLE|TestACL1", jsonEditCfg_Create_DependentMap, false},
+			}
 
-				if err != tc.retCode {
-					t.Errorf("Config Validation failed. %v", cvlErrObj)
-				}
+			cvlErrObj, err := cvSess.ValidateEditConfig(cfgData)
 
-				cfgData = []cmn.CVLEditConfigData{
-					cmn.CVLEditConfigData{cmn.VALIDATE_ALL, cmn.OP_CREATE, "ACL_RULE|TestACL1|Rule1", jsonEditCfg_Create_ConfigMap, false},
-				}
+			if err != tc.retCode {
+				t.Errorf("Config Validation failed. %v", cvlErrObj)
+			}
 
-				cvlErrObj, err = cvSess.ValidateEditConfig(cfgData)
+			cfgData = []cmn.CVLEditConfigData{
+				cmn.CVLEditConfigData{cmn.VALIDATE_ALL, cmn.OP_CREATE, "ACL_RULE|TestACL1|Rule1", jsonEditCfg_Create_ConfigMap, false},
+			}
 
-				if err != tc.retCode {
-					t.Errorf("Config Validation failed. %v", cvlErrObj)
-				}
-			})
-		}
+			cvlErrObj, err = cvSess.ValidateEditConfig(cfgData)
 
-		cvl.ValidationSessClose(cvSess)
+			if err != tc.retCode {
+				t.Errorf("Config Validation failed. %v", cvlErrObj)
+			}
+		})
 	}
+
+	cvl.ValidationSessClose(cvSess)
 }
 
 /* ValidateEditConfig with user input inline. */
@@ -528,48 +517,45 @@ func TestValidateEditConfig_CfgStrBuffer(t *testing.T) {
 		retCode         cvl.CVLRetCode
 	}
 
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-		tests := []testStruct{}
+	tests := []testStruct{}
 
-		/* Iterate through data present is separate file. */
-		for index, _ := range json_edit_config_create_acl_table_dependent_data {
-			tests = append(tests, testStruct{filedescription: "ACL_DATA", cfgData: json_edit_config_create_acl_rule_config_data[index],
-				depData: json_edit_config_create_acl_table_dependent_data[index], retCode: cvl.CVL_SUCCESS})
-		}
-
-		for index, tc := range tests {
-			t.Logf("Running Testcase %d with Description %s", index+1, tc.filedescription)
-			t.Run(tc.filedescription+" "+dbName, func(t *testing.T) {
-				jsonEditCfg_Create_DependentMap := convertDataStringToMap(t, tc.depData)
-				jsonEditCfg_Create_ConfigMap := convertDataStringToMap(t, tc.cfgData)
-
-				cfgData := []cmn.CVLEditConfigData{
-					cmn.CVLEditConfigData{cmn.VALIDATE_ALL, cmn.OP_CREATE, "ACL_TABLE|TestACL1", jsonEditCfg_Create_DependentMap, false},
-				}
-
-				cvlErrObj, err := cvSess.ValidateEditConfig(cfgData)
-
-				if err != tc.retCode {
-					t.Errorf("Config Validation failed. %v", cvlErrObj)
-				}
-
-				cfgData = []cmn.CVLEditConfigData{
-					cmn.CVLEditConfigData{cmn.VALIDATE_ALL, cmn.OP_CREATE, "ACL_RULE|TestACL1|Rule1", jsonEditCfg_Create_ConfigMap, false},
-				}
-
-				cvlErrObj, err = cvSess.ValidateEditConfig(cfgData)
-
-				if err != tc.retCode {
-					t.Errorf("Config Validation failed. %v", cvlErrObj)
-				}
-			})
-		}
-
-		cvl.ValidationSessClose(cvSess)
+	/* Iterate through data present is separate file. */
+	for index, _ := range json_edit_config_create_acl_table_dependent_data {
+		tests = append(tests, testStruct{filedescription: "ACL_DATA", cfgData: json_edit_config_create_acl_rule_config_data[index],
+			depData: json_edit_config_create_acl_table_dependent_data[index], retCode: cvl.CVL_SUCCESS})
 	}
+
+	for index, tc := range tests {
+		t.Logf("Running Testcase %d with Description %s", index+1, tc.filedescription)
+		t.Run(tc.filedescription, func(t *testing.T) {
+			jsonEditCfg_Create_DependentMap := convertDataStringToMap(t, tc.depData)
+			jsonEditCfg_Create_ConfigMap := convertDataStringToMap(t, tc.cfgData)
+
+			cfgData := []cmn.CVLEditConfigData{
+				cmn.CVLEditConfigData{cmn.VALIDATE_ALL, cmn.OP_CREATE, "ACL_TABLE|TestACL1", jsonEditCfg_Create_DependentMap, false},
+			}
+
+			cvlErrObj, err := cvSess.ValidateEditConfig(cfgData)
+
+			if err != tc.retCode {
+				t.Errorf("Config Validation failed. %v", cvlErrObj)
+			}
+
+			cfgData = []cmn.CVLEditConfigData{
+				cmn.CVLEditConfigData{cmn.VALIDATE_ALL, cmn.OP_CREATE, "ACL_RULE|TestACL1|Rule1", jsonEditCfg_Create_ConfigMap, false},
+			}
+
+			cvlErrObj, err = cvSess.ValidateEditConfig(cfgData)
+
+			if err != tc.retCode {
+				t.Errorf("Config Validation failed. %v", cvlErrObj)
+			}
+		})
+	}
+
+	cvl.ValidationSessClose(cvSess)
 }
 
 /* API when config is given as string buffer. */
@@ -590,8 +576,7 @@ func TestValidateConfig_CfgStrBuffer(t *testing.T) {
 		tests = append(tests, testStruct{filedescription: modelName, jsonString: json_validate_config_data[index], retCode: cvl.CVL_SUCCESS})
 	}
 
-	d := getMDBInstance(hostDBName)
-	cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
 	for index, tc := range tests {
 		t.Logf("Running Testcase %d with Description %s", index+1, tc.filedescription)
@@ -621,53 +606,47 @@ func TestValidateConfig_CfgFile(t *testing.T) {
 		{filedescription: "Config File - VLAN,ACL,PORTCHANNEL", fileName: "testdata/config_db1.json", retCode: cvl.CVL_SUCCESS},
 	}
 
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-		for index, tc := range tests {
+	for index, tc := range tests {
 
-			t.Logf("Running Testcase %d with Description %s", index+1, tc.filedescription)
-			t.Run(tc.filedescription+" "+dbName, func(t *testing.T) {
-				jsonString := convertJsonFileToString(t, tc.fileName)
-				err := cvSess.ValidateConfig(jsonString)
+		t.Logf("Running Testcase %d with Description %s", index+1, tc.filedescription)
+		t.Run(tc.filedescription, func(t *testing.T) {
+			jsonString := convertJsonFileToString(t, tc.fileName)
+			err := cvSess.ValidateConfig(jsonString)
 
-				if err != tc.retCode {
-					t.Errorf("Config Validation failed.")
-				}
+			if err != tc.retCode {
+				t.Errorf("Config Validation failed.")
+			}
 
-			})
-		}
-
-		cvl.ValidationSessClose(cvSess)
+		})
 	}
+
+	cvl.ValidationSessClose(cvSess)
 }
 
 // Validate invalid json data
 func TestValidateConfig_Negative(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
-		jsonData := `{
-			"VLANjunk": {
-				"Vlan100": {
-					"members": [
-					"Ethernet4",
-					"Ethernet8"
-					],
-					"vlanid": "100"
-				}
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
+	jsonData := `{
+		"VLANjunk": {
+			"Vlan100": {
+				"members": [
+				"Ethernet4",
+				"Ethernet8"
+				],
+				"vlanid": "100"
 			}
-		}`
-
-		err := cvSess.ValidateConfig(jsonData)
-
-		if err == cvl.CVL_SUCCESS { //Should return failure
-			t.Errorf("Config Validation failed.")
 		}
+	}`
 
-		cvl.ValidationSessClose(cvSess)
+	err := cvSess.ValidateConfig(jsonData)
+
+	if err == cvl.CVL_SUCCESS { //Should return failure
+		t.Errorf("Config Validation failed.")
 	}
+
+	cvl.ValidationSessClose(cvSess)
 }
 
 /* Delete Existing Key.*/
@@ -704,7 +683,7 @@ func TestValidateEditConfig_Delete_Semantic_ACLTableReference_Positive(t *testin
 		},
 	}
 
-	cvSess, _ := NewCvlSession()
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
 	cvlErrInfo, err := cvSess.ValidateEditConfig(cfgData)
 
@@ -1665,7 +1644,7 @@ func TestValidateEditConfig_Update_Syntax_DependentData_Negative(t *testing.T) {
 		},
 	}
 
-	cvSess, _ := NewCvlSession()
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
 	cvlErrObj, err := cvSess.ValidateEditConfig(cfgData)
 
@@ -1749,7 +1728,7 @@ func TestValidateEditConfig_Create_Syntax_DependentData_Negative(t *testing.T) {
 		},
 	}
 
-	cvSess, _ := NewCvlSession()
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
 	cvlErrInfo, err := cvSess.ValidateEditConfig(cfgData)
 
@@ -2017,30 +1996,27 @@ func TestValidateEditConfig_Update_Semantic_Positive(t *testing.T) {
 /* API to test edit config with valid syntax. */
 func TestValidateConfig_Semantic_Vlan_Negative(t *testing.T) {
 
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-		jsonData := `{
-			"VLAN": {
-				"Vlan100": {
-					"members": [
-					"Ethernet44",
-					"Ethernet64"
-					],
-					"vlanid": "107"
-				}
-			}
-		}`
+	jsonData := `{
+                        "VLAN": {
+                                "Vlan100": {
+                                        "members": [
+                                        "Ethernet44",
+                                        "Ethernet64"
+                                        ],
+                                        "vlanid": "107"
+                                }
+                        }
+                }`
 
-		err := cvSess.ValidateConfig(jsonData)
+	err := cvSess.ValidateConfig(jsonData)
 
-		if err == cvl.CVL_SUCCESS { //Expected semantic failure
-			t.Errorf("Config Validation failed -- error details.")
-		}
-
-		cvl.ValidationSessClose(cvSess)
+	if err == cvl.CVL_SUCCESS { //Expected semantic failure
+		t.Errorf("Config Validation failed -- error details.")
 	}
+
+	cvl.ValidationSessClose(cvSess)
 }
 
 func TestValidateEditConfig_Update_Syntax_DependentData_Redis_Positive(t *testing.T) {
@@ -2087,8 +2063,7 @@ func TestValidateEditConfig_Update_Syntax_DependentData_Redis_Positive(t *testin
 		},
 	}
 
-	d := getMDBInstance(hostDBName)
-	cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
 	cvlErrInfo, retCode := cvSess.ValidateEditConfig(cfgData)
 
@@ -2140,74 +2115,67 @@ func TestValidateEditConfig_Update_Syntax_DependentData_Invalid_Op_Seq(t *testin
 		},
 	}
 
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-		cvSess, _ := NewCvlSession(d)
+	cvlErrInfo, err := cvSess.ValidateEditConfig(cfgData)
 
-		cvlErrInfo, err := cvSess.ValidateEditConfig(cfgData)
+	cvl.ValidationSessClose(cvSess)
 
-		cvl.ValidationSessClose(cvSess)
-
-		if err == cvl.CVL_SUCCESS { //Validation should fail
-			t.Errorf("Config Validation failed -- error details %v", cvlErrInfo)
-		}
+	if err == cvl.CVL_SUCCESS { //Validation should fail
+		t.Errorf("Config Validation failed -- error details %v", cvlErrInfo)
 	}
+
 }
 
 /* Create with User provided dependent data. */
 func TestValidateEditConfig_Create_Syntax_DependentData_Redis_Positive(t *testing.T) {
 
-	for _, dbName := range MdbNames {
-		/* ACL and Rule name pre-created . */
-		cfgData := []cmn.CVLEditConfigData{
-			cmn.CVLEditConfigData{
-				cmn.VALIDATE_ALL,
-				cmn.OP_CREATE,
-				"ACL_TABLE|TestACL22",
-				map[string]string{
-					"stage": "INGRESS",
-					"type":  "MIRROR",
-				},
-				false,
+	/* ACL and Rule name pre-created . */
+	cfgData := []cmn.CVLEditConfigData{
+		cmn.CVLEditConfigData{
+			cmn.VALIDATE_ALL,
+			cmn.OP_CREATE,
+			"ACL_TABLE|TestACL22",
+			map[string]string{
+				"stage": "INGRESS",
+				"type":  "MIRROR",
 			},
-		}
+			false,
+		},
+	}
 
-		d := getMDBInstance(dbName)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-		cvSess, _ := NewCvlSession(d)
+	cvlErrInfo, err := cvSess.ValidateEditConfig(cfgData)
 
-		cvlErrInfo, err := cvSess.ValidateEditConfig(cfgData)
+	if err != cvl.CVL_SUCCESS {
+		t.Errorf("Config Validation failed -- error details %v", cvlErrInfo)
+	}
 
-		if err != cvl.CVL_SUCCESS {
-			t.Errorf("Config Validation failed -- error details %v", cvlErrInfo)
-		}
-
-		cfgData = []cmn.CVLEditConfigData{
-			cmn.CVLEditConfigData{
-				cmn.VALIDATE_ALL,
-				cmn.OP_CREATE,
-				"ACL_RULE|TestACL22|Rule1",
-				map[string]string{
-					"PACKET_ACTION":     "FORWARD",
-					"IP_TYPE":           "IPV4",
-					"SRC_IP":            "10.1.1.1/32",
-					"L4_SRC_PORT":       "1909",
-					"IP_PROTOCOL":       "103",
-					"DST_IP":            "20.2.2.2/32",
-					"L4_DST_PORT_RANGE": "9000-12000",
-				},
-				false,
+	cfgData = []cmn.CVLEditConfigData{
+		cmn.CVLEditConfigData{
+			cmn.VALIDATE_ALL,
+			cmn.OP_CREATE,
+			"ACL_RULE|TestACL22|Rule1",
+			map[string]string{
+				"PACKET_ACTION":     "FORWARD",
+				"IP_TYPE":           "IPV4",
+				"SRC_IP":            "10.1.1.1/32",
+				"L4_SRC_PORT":       "1909",
+				"IP_PROTOCOL":       "103",
+				"DST_IP":            "20.2.2.2/32",
+				"L4_DST_PORT_RANGE": "9000-12000",
 			},
-		}
+			false,
+		},
+	}
 
-		cvlErrInfo, err = cvSess.ValidateEditConfig(cfgData)
+	cvlErrInfo, err = cvSess.ValidateEditConfig(cfgData)
 
-		cvl.ValidationSessClose(cvSess)
+	cvl.ValidationSessClose(cvSess)
 
-		if err != cvl.CVL_SUCCESS {
-			t.Errorf("Config Validation failed -- error details %v", cvlErrInfo)
-		}
+	if err != cvl.CVL_SUCCESS {
+		t.Errorf("Config Validation failed -- error details %v", cvlErrInfo)
 	}
 }
 
@@ -2233,106 +2201,100 @@ func TestValidateEditConfig_Delete_Semantic_ACLTableReference_Negative(t *testin
 
 func TestValidateEditConfig_Create_Dependent_CacheData(t *testing.T) {
 
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-		//Create ACL rule
-		cfgDataAcl := []cmn.CVLEditConfigData{
-			cmn.CVLEditConfigData{
-				cmn.VALIDATE_ALL,
-				cmn.OP_CREATE,
-				"ACL_TABLE|TestACL14",
-				map[string]string{
-					"stage": "INGRESS",
-					"type":  "MIRROR",
-				},
-				false,
+	//Create ACL rule
+	cfgDataAcl := []cmn.CVLEditConfigData{
+		cmn.CVLEditConfigData{
+			cmn.VALIDATE_ALL,
+			cmn.OP_CREATE,
+			"ACL_TABLE|TestACL14",
+			map[string]string{
+				"stage": "INGRESS",
+				"type":  "MIRROR",
 			},
-		}
-
-		cvlErrInfo, err1 := cvSess.ValidateEditConfig(cfgDataAcl)
-
-		//Create ACL rule
-		cfgDataRule := []cmn.CVLEditConfigData{
-			cmn.CVLEditConfigData{
-				cmn.VALIDATE_ALL,
-				cmn.OP_CREATE,
-				"ACL_RULE|TestACL14|Rule1",
-				map[string]string{
-					"PACKET_ACTION":     "FORWARD",
-					"IP_TYPE":           "IPV4",
-					"SRC_IP":            "10.1.1.1/32",
-					"L4_SRC_PORT":       "1909",
-					"IP_PROTOCOL":       "103",
-					"DST_IP":            "20.2.2.2/32",
-					"L4_DST_PORT_RANGE": "9000-12000",
-				},
-				false,
-			},
-		}
-
-		cvlErrInfo, err2 := cvSess.ValidateEditConfig(cfgDataRule)
-
-		if err1 != cvl.CVL_SUCCESS || err2 != cvl.CVL_SUCCESS {
-			t.Errorf("Config Validation failed -- error details %v", cvlErrInfo)
-		}
-		cvl.ValidationSessClose(cvSess)
+			false,
+		},
 	}
+
+	cvlErrInfo, err1 := cvSess.ValidateEditConfig(cfgDataAcl)
+
+	//Create ACL rule
+	cfgDataRule := []cmn.CVLEditConfigData{
+		cmn.CVLEditConfigData{
+			cmn.VALIDATE_ALL,
+			cmn.OP_CREATE,
+			"ACL_RULE|TestACL14|Rule1",
+			map[string]string{
+				"PACKET_ACTION":     "FORWARD",
+				"IP_TYPE":           "IPV4",
+				"SRC_IP":            "10.1.1.1/32",
+				"L4_SRC_PORT":       "1909",
+				"IP_PROTOCOL":       "103",
+				"DST_IP":            "20.2.2.2/32",
+				"L4_DST_PORT_RANGE": "9000-12000",
+			},
+			false,
+		},
+	}
+
+	cvlErrInfo, err2 := cvSess.ValidateEditConfig(cfgDataRule)
+
+	if err1 != cvl.CVL_SUCCESS || err2 != cvl.CVL_SUCCESS {
+		t.Errorf("Config Validation failed -- error details %v", cvlErrInfo)
+	}
+	cvl.ValidationSessClose(cvSess)
 }
 
 func TestValidateEditConfig_Create_DepData_In_MultiSess(t *testing.T) {
 
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-
-		//Create ACL rule - Session 1
-		cvSess, _ := NewCvlSession(d)
-		cfgDataAcl := []cmn.CVLEditConfigData{
-			cmn.CVLEditConfigData{
-				cmn.VALIDATE_ALL,
-				cmn.OP_CREATE,
-				"ACL_TABLE|TestACL16",
-				map[string]string{
-					"stage": "INGRESS",
-					"type":  "MIRROR",
-				},
-				false,
+	//Create ACL rule - Session 1
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
+	cfgDataAcl := []cmn.CVLEditConfigData{
+		cmn.CVLEditConfigData{
+			cmn.VALIDATE_ALL,
+			cmn.OP_CREATE,
+			"ACL_TABLE|TestACL16",
+			map[string]string{
+				"stage": "INGRESS",
+				"type":  "MIRROR",
 			},
-		}
-
-		cvlErrInfo, err1 := cvSess.ValidateEditConfig(cfgDataAcl)
-
-		cvl.ValidationSessClose(cvSess)
-
-		//Create ACL rule - Session 2, validation should fail
-		cvSess, _ = NewCvlSession(d)
-		cfgDataRule := []cmn.CVLEditConfigData{
-			cmn.CVLEditConfigData{
-				cmn.VALIDATE_ALL,
-				cmn.OP_CREATE,
-				"ACL_RULE|TestACL16|Rule1",
-				map[string]string{
-					"PACKET_ACTION":     "FORWARD",
-					"IP_TYPE":           "IPV4",
-					"SRC_IP":            "10.1.1.1/32",
-					"L4_SRC_PORT":       "1909",
-					"IP_PROTOCOL":       "103",
-					"DST_IP":            "20.2.2.2/32",
-					"L4_DST_PORT_RANGE": "9000-12000",
-				},
-				false,
-			},
-		}
-
-		_, err2 := cvSess.ValidateEditConfig(cfgDataRule)
-
-		cvl.ValidationSessClose(cvSess)
-
-		if err1 != cvl.CVL_SUCCESS || err2 == cvl.CVL_SUCCESS {
-			t.Errorf("Config Validation failed -- error details %v", cvlErrInfo)
-		}
+			false,
+		},
 	}
+
+	cvlErrInfo, err1 := cvSess.ValidateEditConfig(cfgDataAcl)
+
+	cvl.ValidationSessClose(cvSess)
+
+	//Create ACL rule - Session 2, validation should fail
+	cvSess, _ = NewCvlSession(getMDBInstance(hostDBName))
+	cfgDataRule := []cmn.CVLEditConfigData{
+		cmn.CVLEditConfigData{
+			cmn.VALIDATE_ALL,
+			cmn.OP_CREATE,
+			"ACL_RULE|TestACL16|Rule1",
+			map[string]string{
+				"PACKET_ACTION":     "FORWARD",
+				"IP_TYPE":           "IPV4",
+				"SRC_IP":            "10.1.1.1/32",
+				"L4_SRC_PORT":       "1909",
+				"IP_PROTOCOL":       "103",
+				"DST_IP":            "20.2.2.2/32",
+				"L4_DST_PORT_RANGE": "9000-12000",
+			},
+			false,
+		},
+	}
+
+	_, err2 := cvSess.ValidateEditConfig(cfgDataRule)
+
+	cvl.ValidationSessClose(cvSess)
+
+	if err1 != cvl.CVL_SUCCESS || err2 == cvl.CVL_SUCCESS {
+		t.Errorf("Config Validation failed -- error details %v", cvlErrInfo)
+	}
+
 }
 
 func TestValidateEditConfig_Create_DepData_From_Redis_Negative11(t *testing.T) {
@@ -2513,7 +2475,7 @@ func TestValidateEditConfig_Create_DepData_From_Redis_Negative(t *testing.T) {
 		},
 	}
 
-	cvSess, _ := NewCvlSession()
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
 	cvlErrInfo, err := cvSess.ValidateEditConfig(cfgDataRule)
 
@@ -2823,8 +2785,7 @@ func TestValidateConfig_Repeated_Keys_Positive(t *testing.T) {
 		}
 	}`
 
-	d := getMDBInstance(hostDBName)
-	cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 	err := cvSess.ValidateConfig(jsonData)
 
 	if err != cvl.CVL_SUCCESS {
@@ -2848,8 +2809,7 @@ func TestValidateEditConfig_Delete_Entry_Then_Dep_Leafref_Positive(t *testing.T)
 		},
 	})
 
-	d := getMDBInstance(hostDBName)
-	cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
 	cfgDataAcl := []cmn.CVLEditConfigData{
 		cmn.CVLEditConfigData{
@@ -2942,7 +2902,7 @@ func TestServicability_Debug_Trace(t *testing.T) {
 	})
 
 	//Create ACL rule - Session 2
-	cvSess, _ := NewCvlSession()
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 	cfgDataRule := []cmn.CVLEditConfigData{
 		cmn.CVLEditConfigData{
 			cmn.VALIDATE_ALL,
@@ -2998,8 +2958,7 @@ func TestValidateEditConfig_Delete_Create_Same_Entry_Positive(t *testing.T) {
 		},
 	})
 
-	d := getMDBInstance(hostDBName)
-	cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
 	cfgDataVlan := []cmn.CVLEditConfigData{
 		cmn.CVLEditConfigData{
@@ -3045,14 +3004,11 @@ func TestValidateEditConfig_Delete_Create_Same_Entry_Positive(t *testing.T) {
 }
 
 func TestValidateStartupConfig_Positive(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
-		if cvl.CVL_NOT_IMPLEMENTED != cvSess.ValidateStartupConfig("") {
-			t.Errorf("Not implemented yet.")
-		}
-		cvl.ValidationSessClose(cvSess)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
+	if cvl.CVL_NOT_IMPLEMENTED != cvSess.ValidateStartupConfig("") {
+		t.Errorf("Not implemented yet.")
 	}
+	cvl.ValidationSessClose(cvSess)
 }
 
 func TestValidateIncrementalConfig_Positive(t *testing.T) {
@@ -3089,8 +3045,7 @@ func TestValidateIncrementalConfig_Positive(t *testing.T) {
 	//Prepare data in Redis
 	setupTestData(t, existingDataMap)
 
-	d := getMDBInstance(hostDBName)
-	cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
 	jsonData := `{
 		"VLAN": {
@@ -3124,38 +3079,29 @@ func TestValidateIncrementalConfig_Positive(t *testing.T) {
 
 // Validate key only
 func TestValidateKeys(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
-		if cvl.CVL_NOT_IMPLEMENTED != cvSess.ValidateKeys([]string{}) {
-			t.Errorf("Not implemented yet.")
-		}
-		cvl.ValidationSessClose(cvSess)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
+	if cvl.CVL_NOT_IMPLEMENTED != cvSess.ValidateKeys([]string{}) {
+		t.Errorf("Not implemented yet.")
 	}
+	cvl.ValidationSessClose(cvSess)
 }
 
 // Validate key and data
 func TestValidateKeyData(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
-		if cvl.CVL_NOT_IMPLEMENTED != cvSess.ValidateKeyData("", "") {
-			t.Errorf("Not implemented yet.")
-		}
-		cvl.ValidationSessClose(cvSess)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
+	if cvl.CVL_NOT_IMPLEMENTED != cvSess.ValidateKeyData("", "") {
+		t.Errorf("Not implemented yet.")
 	}
+	cvl.ValidationSessClose(cvSess)
 }
 
 // Validate key, field and value
 func TestValidateFields(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
-		if cvl.CVL_NOT_IMPLEMENTED != cvSess.ValidateFields("", "", "") {
-			t.Errorf("Not implemented yet.")
-		}
-		cvl.ValidationSessClose(cvSess)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
+	if cvl.CVL_NOT_IMPLEMENTED != cvSess.ValidateFields("", "", "") {
+		t.Errorf("Not implemented yet.")
 	}
+	cvl.ValidationSessClose(cvSess)
 }
 
 func TestValidateEditConfig_Two_Updates_Positive(t *testing.T) {
@@ -3433,189 +3379,169 @@ func TestValidateEditConfig_EmptyNode_Positive(t *testing.T) {
 }
 
 func TestSortDepTables(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-		result, _ := cvSess.SortDepTables([]string{"PORT", "ACL_RULE", "ACL_TABLE"})
+	result, _ := cvSess.SortDepTables([]string{"PORT", "ACL_RULE", "ACL_TABLE"})
 
-		expectedResult := []string{"ACL_RULE", "ACL_TABLE", "PORT"}
+	expectedResult := []string{"ACL_RULE", "ACL_TABLE", "PORT"}
 
-		if len(expectedResult) != len(result) {
-			t.Errorf("Validation failed, returned value = %v", result)
-			return
-		}
-
-		for i := 0; i < len(expectedResult); i++ {
-			if result[i] != expectedResult[i] {
-				t.Errorf("Validation failed, returned value = %v", result)
-				break
-			}
-		}
-
-		cvl.ValidationSessClose(cvSess)
+	if len(expectedResult) != len(result) {
+		t.Errorf("Validation failed, returned value = %v", result)
+		return
 	}
+
+	for i := 0; i < len(expectedResult); i++ {
+		if result[i] != expectedResult[i] {
+			t.Errorf("Validation failed, returned value = %v", result)
+			break
+		}
+	}
+
+	cvl.ValidationSessClose(cvSess)
 }
 
 func TestSortDepTablesWithMultiListTargetRaw(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-		result, _ := cvSess.SortDepList([]string{"VLAN_SUB_INTERFACE", "OSPFV2_INTERFACE"})
+	result, _ := cvSess.SortDepList([]string{"VLAN_SUB_INTERFACE", "OSPFV2_INTERFACE"})
 
-		expectedResult := []string{"OSPFV2_INTERFACE", "VLAN_SUB_INTERFACE_IPADDR", "VLAN_SUB_INTERFACE"}
+	expectedResult := []string{"OSPFV2_INTERFACE", "VLAN_SUB_INTERFACE_IPADDR", "VLAN_SUB_INTERFACE"}
 
-		for i := 0; i < len(expectedResult); i++ {
-			if result[i] != expectedResult[i] {
-				t.Errorf("Validation failed, returned value = %v", result)
-				break
-			}
+	for i := 0; i < len(expectedResult); i++ {
+		if result[i] != expectedResult[i] {
+			t.Errorf("Validation failed, returned value = %v", result)
+			break
 		}
-
-		cvl.ValidationSessClose(cvSess)
 	}
+
+	cvl.ValidationSessClose(cvSess)
 }
 
 func TestSortDepTablesWithMultiListTarget(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-		result, _ := cvSess.SortDepTables([]string{"VLAN_SUB_INTERFACE", "OSPFV2_INTERFACE"})
+	result, _ := cvSess.SortDepTables([]string{"VLAN_SUB_INTERFACE", "OSPFV2_INTERFACE"})
 
-		expectedResult := []string{"OSPFV2_INTERFACE", "VLAN_SUB_INTERFACE"}
+	expectedResult := []string{"OSPFV2_INTERFACE", "VLAN_SUB_INTERFACE"}
 
-		if len(expectedResult) != len(result) {
-			t.Errorf("Validation failed, returned value = %v", result)
-			return
-		}
-
-		for i := 0; i < len(expectedResult); i++ {
-			if result[i] != expectedResult[i] {
-				t.Errorf("Validation failed, returned value = %v", result)
-				break
-			}
-		}
-
-		cvl.ValidationSessClose(cvSess)
+	if len(expectedResult) != len(result) {
+		t.Errorf("Validation failed, returned value = %v", result)
+		return
 	}
+
+	for i := 0; i < len(expectedResult); i++ {
+		if result[i] != expectedResult[i] {
+			t.Errorf("Validation failed, returned value = %v", result)
+			break
+		}
+	}
+
+	cvl.ValidationSessClose(cvSess)
+
 }
 
 func TestGetOrderedTables(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-		result, _ := cvSess.GetOrderedTables("sonic-vlan")
+	result, _ := cvSess.GetOrderedTables("sonic-vlan")
 
-		expectedResult := []string{"VLAN_MEMBER", "VLAN"}
+	expectedResult := []string{"VLAN_MEMBER", "VLAN"}
 
-		if len(expectedResult) != len(result) {
-			t.Errorf("Validation failed, returned value = %v", result)
-			return
-		}
-
-		for i := 0; i < len(expectedResult); i++ {
-			if result[i] != expectedResult[i] {
-				t.Errorf("Validation failed, returned value = %v", result)
-				break
-			}
-		}
-
-		cvl.ValidationSessClose(cvSess)
+	if len(expectedResult) != len(result) {
+		t.Errorf("Validation failed, returned value = %v", result)
+		return
 	}
+
+	for i := 0; i < len(expectedResult); i++ {
+		if result[i] != expectedResult[i] {
+			t.Errorf("Validation failed, returned value = %v", result)
+			break
+		}
+	}
+
+	cvl.ValidationSessClose(cvSess)
 }
 
 func TestGetOrderedDepTables(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-		result, _ := cvSess.GetOrderedDepTables("sonic-vlan", "VLAN")
+	result, _ := cvSess.GetOrderedDepTables("sonic-vlan", "VLAN")
 
-		expectedResult := []string{"VLAN_MEMBER", "VLAN"}
+	expectedResult := []string{"VLAN_MEMBER", "VLAN"}
 
-		if len(expectedResult) != len(result) {
-			t.Errorf("Validation failed, returned value = %v", result)
-			return
-		}
-
-		for i := 0; i < len(expectedResult); i++ {
-			if result[i] != expectedResult[i] {
-				t.Errorf("Validation failed, returned value = %v", result)
-				break
-			}
-		}
-
-		cvl.ValidationSessClose(cvSess)
+	if len(expectedResult) != len(result) {
+		t.Errorf("Validation failed, returned value = %v", result)
+		return
 	}
+
+	for i := 0; i < len(expectedResult); i++ {
+		if result[i] != expectedResult[i] {
+			t.Errorf("Validation failed, returned value = %v", result)
+			break
+		}
+	}
+
+	cvl.ValidationSessClose(cvSess)
 }
 
 func TestGetDepTables(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-		result, _ := cvSess.GetDepTables("sonic-acl", "ACL_RULE")
+	result, _ := cvSess.GetDepTables("sonic-acl", "ACL_RULE")
 
-		expectedResult := []string{"ACL_RULE", "ACL_TABLE", "MIRROR_SESSION", "PORT", "PORTCHANNEL"}
+	expectedResult := []string{"ACL_RULE", "ACL_TABLE", "MIRROR_SESSION", "PORT", "PORTCHANNEL"}
 
-		sort.Strings(result)
-		sort.Strings(expectedResult)
-		if !reflect.DeepEqual(result, expectedResult) {
-			t.Errorf("Validation failed, returned value = %v", result)
-		}
-
-		cvl.ValidationSessClose(cvSess)
+	sort.Strings(result)
+	sort.Strings(expectedResult)
+	if !reflect.DeepEqual(result, expectedResult) {
+		t.Errorf("Validation failed, returned value = %v", result)
 	}
+
+	cvl.ValidationSessClose(cvSess)
 }
 
 func TestDependentOnExtension(t *testing.T) {
-	for _, dbName := range MdbNames {
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
-		defer cvl.ValidationSessClose(cvSess)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
+	defer cvl.ValidationSessClose(cvSess)
 
-		// Test GetDepTables API
-		result, _ := cvSess.GetDepTables("sonic-spanning-tree", "STP_VLAN")
-		expectedResult := []string{"STP_VLAN", "VLAN", "STP", "PORT", "PORTCHANNEL"}
-		sort.Strings(result)
-		sort.Strings(expectedResult)
-		if !reflect.DeepEqual(result, expectedResult) {
-			t.Errorf("TestDependentOnExtension: Validation of GetDepTables failed, returned value = %v", result)
-			return
-		}
+	// Test GetDepTables API
+	result, _ := cvSess.GetDepTables("sonic-spanning-tree", "STP_VLAN")
+	expectedResult := []string{"STP_VLAN", "VLAN", "STP", "PORT", "PORTCHANNEL"}
+	sort.Strings(result)
+	sort.Strings(expectedResult)
+	if !reflect.DeepEqual(result, expectedResult) {
+		t.Errorf("TestDependentOnExtension: Validation of GetDepTables failed, returned value = %v", result)
+		return
+	}
 
-		// Test GetOrderedDepTables API
-		result, _ = cvSess.GetOrderedDepTables("sonic-spanning-tree", "STP")
-		expectedResult = []string{"STP_PORT", "STP_VLAN", "STP"}
-		sort.Strings(result)
-		sort.Strings(expectedResult)
-		if !reflect.DeepEqual(result, expectedResult) {
-			t.Errorf("TestDependentOnExtension: Validation of GetOrderedDepTables failed, returned value = %v", result)
-			return
-		}
+	// Test GetOrderedDepTables API
+	result, _ = cvSess.GetOrderedDepTables("sonic-spanning-tree", "STP")
+	expectedResult = []string{"STP_PORT", "STP_VLAN", "STP"}
+	sort.Strings(result)
+	sort.Strings(expectedResult)
+	if !reflect.DeepEqual(result, expectedResult) {
+		t.Errorf("TestDependentOnExtension: Validation of GetOrderedDepTables failed, returned value = %v", result)
+		return
+	}
 
-		// Test GetOrderedTables API
-		result, _ = cvSess.GetOrderedTables("sonic-spanning-tree")
-		expectedResult = []string{"STP", "STP_PORT", "STP_VLAN", "STP_VLAN_PORT"}
-		sort.Strings(result)
-		sort.Strings(expectedResult)
-		if !reflect.DeepEqual(result, expectedResult) {
-			t.Errorf("TestDependentOnExtension: Validation of GetOrderedTables failed, returned value = %v", result)
-			return
-		}
+	// Test GetOrderedTables API
+	result, _ = cvSess.GetOrderedTables("sonic-spanning-tree")
+	expectedResult = []string{"STP", "STP_PORT", "STP_VLAN", "STP_VLAN_PORT"}
+	sort.Strings(result)
+	sort.Strings(expectedResult)
+	if !reflect.DeepEqual(result, expectedResult) {
+		t.Errorf("TestDependentOnExtension: Validation of GetOrderedTables failed, returned value = %v", result)
+		return
+	}
 
-		// Test SortDepTables API
-		result, _ = cvSess.SortDepTables([]string{"STP_VLAN", "STP", "STP_PORT"})
-		expectedResult = []string{"STP_VLAN", "STP_PORT", "STP"}
-		sort.Strings(result)
-		sort.Strings(expectedResult)
-		if !reflect.DeepEqual(result, expectedResult) {
-			t.Errorf("TestDependentOnExtension: Validation of SortDepTables failed, returned value = %v", result)
-			return
-		}
+	// Test SortDepTables API
+	result, _ = cvSess.SortDepTables([]string{"STP_VLAN", "STP", "STP_PORT"})
+	expectedResult = []string{"STP_VLAN", "STP_PORT", "STP"}
+	sort.Strings(result)
+	sort.Strings(expectedResult)
+	if !reflect.DeepEqual(result, expectedResult) {
+		t.Errorf("TestDependentOnExtension: Validation of SortDepTables failed, returned value = %v", result)
+		return
 	}
 }
 
@@ -3685,8 +3611,7 @@ func TestGetDepDataForDelete(t *testing.T) {
 		},
 	})
 
-	d := getMDBInstance(hostDBName)
-	cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
 	depEntries := cvSess.GetDepDataForDelete("PORT|Ethernet7")
 
@@ -4055,49 +3980,46 @@ func TestValidateEditConfig_Update_Leaf_List_Max_Elements_Negative(t *testing.T)
 }
 
 func TestValidationTimeStats(t *testing.T) {
-	for _, dbName := range MdbNames {
-		cvl.ClearValidationTimeStats()
+	cvl.ClearValidationTimeStats()
 
-		stats := cvl.GetValidationTimeStats()
+	stats := cvl.GetValidationTimeStats()
 
-		if stats.Hits != 0 || stats.Time != 0 || stats.Peak != 0 {
-			t.Errorf("TestValidationTimeStats : clearing stats failed")
-			return
-		}
+	if stats.Hits != 0 || stats.Time != 0 || stats.Peak != 0 {
+		t.Errorf("TestValidationTimeStats : clearing stats failed")
+		return
+	}
 
-		d := getMDBInstance(dbName)
-		cvSess, _ := NewCvlSession(d)
+	cvSess, _ := NewCvlSession(getMDBInstance(hostDBName))
 
-		cfgData := []cmn.CVLEditConfigData{
-			cmn.CVLEditConfigData{
-				cmn.VALIDATE_ALL,
-				cmn.OP_CREATE,
-				"VRF|VrfTest",
-				map[string]string{
-					"fallback": "true",
-				},
-				false,
+	cfgData := []cmn.CVLEditConfigData{
+		cmn.CVLEditConfigData{
+			cmn.VALIDATE_ALL,
+			cmn.OP_CREATE,
+			"VRF|VrfTest",
+			map[string]string{
+				"fallback": "true",
 			},
-		}
+			false,
+		},
+	}
 
-		cvSess.ValidateEditConfig(cfgData)
+	cvSess.ValidateEditConfig(cfgData)
 
-		cvl.ValidationSessClose(cvSess)
+	cvl.ValidationSessClose(cvSess)
 
-		stats = cvl.GetValidationTimeStats()
+	stats = cvl.GetValidationTimeStats()
 
-		if stats.Hits == 0 || stats.Time == 0 || stats.Peak == 0 {
-			t.Errorf("TestValidationTimeStats : getting stats failed")
-			return
-		}
+	if stats.Hits == 0 || stats.Time == 0 || stats.Peak == 0 {
+		t.Errorf("TestValidationTimeStats : getting stats failed")
+		return
+	}
 
-		//Clear stats again and check
-		cvl.ClearValidationTimeStats()
+	//Clear stats again and check
+	cvl.ClearValidationTimeStats()
 
-		stats = cvl.GetValidationTimeStats()
+	stats = cvl.GetValidationTimeStats()
 
-		if stats.Hits != 0 || stats.Time != 0 || stats.Peak != 0 {
-			t.Errorf("TestValidationTimeStats : clearing stats failed")
-		}
+	if stats.Hits != 0 || stats.Time != 0 || stats.Peak != 0 {
+		t.Errorf("TestValidationTimeStats : clearing stats failed")
 	}
 }

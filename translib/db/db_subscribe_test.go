@@ -50,7 +50,6 @@ var hostDBName string = "host"
 func newCCDB(dBNum DBNum) (*DB, error) {
 	d, e := NewDB(Options{
 		DBNo:                    dBNum,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -82,7 +81,7 @@ func cleanupSub(t *testing.T, d *DB, deleteDB bool) {
 	d.DeleteEntry(sTs, d.redis2key(sTs, sK))
 }
 
-func subHdlr(d *DB, skey *SKey, key *Key, event SEvent, dbName string) error {
+func subHdlr(d *DB, skey *SKey, key *Key, event SEvent) error {
 	fmt.Println("subHdlr: d: ", d, " skey: ", *skey, " key: ", *key,
 		" event: ", event)
 	switch event {
@@ -159,7 +158,6 @@ func TestSubscribeHFunc(t *testing.T) {
 
 	subD, e := SubscribeDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -320,7 +318,6 @@ func TestSubscribeHFuncSA(t *testing.T) {
 
 	subD, e := SubscribeDBSA(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -447,7 +444,6 @@ func TestSubscribeNoCCNotif2HFuncSA(t *testing.T) {
 
 	subD, e := SubscribeDBSA(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",

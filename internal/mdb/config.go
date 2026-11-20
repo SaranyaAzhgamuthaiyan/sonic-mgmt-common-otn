@@ -1,9 +1,9 @@
 package mdb
 
 const (
-	DefaultAsicConfPath  = "/usr/share/sonic/platform/asic.conf"
-	DefaultKeySeparator  = "-"
-	HostNamespace        = "host"
+	DefaultAsicConfPath = "/usr/share/sonic/platform/asic.conf"
+	DefaultKeySeparator = "-"
+	HostNamespace       = "host"
 )
 
 // Settings holds multi-DB namespace parameters shared by translib and CVL.

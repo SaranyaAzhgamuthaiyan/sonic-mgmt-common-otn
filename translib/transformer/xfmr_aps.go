@@ -486,28 +486,17 @@ var aps_name_get_namespace_xfmr GetNamespaceFunc = func(inParams XfmrParams) ([]
 	// Construct final result
 	var result []NamespacePayload
 	for ns, pwkList := range nsPayloadMap {
-		var mergedInstances []interface{}
 		var firstKey string
-		var listKey string
+		var nsPayloads []map[string]interface{}
 
 		for i, pwk := range pwkList {
 			if i == 0 {
 				firstKey = pwk.key
-				for k := range pwk.payload {
-					listKey = k
-					break
-				}
 			}
-			if listVal, ok := pwk.payload[listKey]; ok {
-				if instances, ok := listVal.([]interface{}); ok {
-					mergedInstances = append(mergedInstances, instances...)
-				}
-			}
+			nsPayloads = append(nsPayloads, pwk.payload)
 		}
 
-		mergedMap := map[string]interface{}{
-			listKey: mergedInstances,
-		}
+		mergedMap := mergeNsPayloads(nsPayloads)
 
 		result = append(result, NamespacePayload{
 			Namespace: ns,

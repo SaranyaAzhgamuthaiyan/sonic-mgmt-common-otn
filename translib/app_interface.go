@@ -107,11 +107,8 @@ type appInterface interface {
 	translateReplace(d *db.DB) ([]db.WatchKeys, error)
 	translateDelete(d *db.DB) ([]db.WatchKeys, error)
 	translateGet(dbs [db.MaxDB]*db.DB) error
-	getNamespace(path string) ([]NamespacePayload, error)
 	translateAction(dbs [db.MaxDB]*db.DB) error
 	translateSubscribe(req translateSubRequest) (translateSubResponse, error)
-	processPreparePhase(d *db.DB, ckey string) error
-	rollback(d *db.DB) error
 	processCreate(d *db.DB) (SetResponse, error)
 	processUpdate(d *db.DB) (SetResponse, error)
 	processReplace(d *db.DB) (SetResponse, error)
@@ -119,7 +116,67 @@ type appInterface interface {
 	processGet(dbs [db.MaxDB]*db.DB, fmtType TranslibFmtType) (GetResponse, error)
 	processAction(dbs [db.MaxDB]*db.DB) (ActionResponse, error)
 	processSubscribe(req processSubRequest) (processSubResponse, error)
+}
+
+// namespaceApp is optionally implemented by app modules that route a request
+// to namespaces other than "host" (e.g. CommonApp via transformers).
+type namespaceApp interface {
+	getNamespace(path string) ([]NamespacePayload, error)
+}
+
+var _ namespaceApp = (*CommonApp)(nil)
+
+// Optional hooks for apps that support rollback and CVL validate-only.
+type preparePhaseApp interface {
+	processPreparePhase(d *db.DB, ckey string) error
+}
+
+type rollbackApp interface {
+	rollback(d *db.DB) error
+}
+
+type cvlValidateApp interface {
 	processCVLValidate(d *db.DB) error
+}
+
+var _ preparePhaseApp = (*CommonApp)(nil)
+var _ rollbackApp = (*CommonApp)(nil)
+var _ cvlValidateApp = (*CommonApp)(nil)
+
+// appPreparePhase, appRollback and appCVLValidate call the optional hook if the
+// app implements it; otherwise they do nothing.
+func appPreparePhase(app appInterface, d *db.DB, ckey string) error {
+	if a, ok := app.(preparePhaseApp); ok {
+		return a.processPreparePhase(d, ckey)
+	}
+	return nil
+}
+
+func appRollback(app appInterface, d *db.DB) error {
+	if a, ok := app.(rollbackApp); ok {
+		return a.rollback(d)
+	}
+	return nil
+}
+
+func appCVLValidate(app appInterface, d *db.DB) error {
+	if a, ok := app.(cvlValidateApp); ok {
+		return a.processCVLValidate(d)
+	}
+	return nil
+}
+
+// getAppNamespace returns the namespaces for the path. Apps that do not
+// implement namespaceApp are served from the "host" namespace.
+func getAppNamespace(app appInterface, path string) ([]NamespacePayload, error) {
+	if nsApp, ok := app.(namespaceApp); ok {
+		return nsApp.getNamespace(path)
+	}
+	return []NamespacePayload{{
+		Namespace: "host",
+		Payloads:  []map[string]interface{}{},
+		Key:       "",
+	}}, nil
 }
 
 // App modules will use this function to register with App interface during boot up

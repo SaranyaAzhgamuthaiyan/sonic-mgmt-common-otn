@@ -200,6 +200,7 @@ func (config *DBCacheConfig) readFromDB() error {
 		for k, v := range defaultDBCacheConfig.NoCacheMaps {
 			config.NoCacheMaps[k] = v
 		}
+
 	} else {
 		for k, v := range fields {
 			switch {

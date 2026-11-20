@@ -46,7 +46,11 @@ func (t *CustomValidation) ValidateStpFeatureEnabled(vc *CustValidationCtxt) CVL
 	if vc.CurCfg.VOp == OP_DELETE {
 		return CVLErrorInfo{}
 	}
-	applDb := util.NewDbClient("APPL_DB")
+	ns := vc.NameSpace
+	if ns == "" {
+		ns = "host"
+	}
+	applDb := util.NewDbClient("APPL_DB." + ns)
 	if applDb == nil {
 		return CVLErrorInfo{
 			ErrCode:       CVL_INTERNAL_UNKNOWN,
