@@ -61,7 +61,6 @@ func TestDefaultTimeout(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -131,7 +130,6 @@ func blockLUAScript(wg *sync.WaitGroup, secs int, t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",

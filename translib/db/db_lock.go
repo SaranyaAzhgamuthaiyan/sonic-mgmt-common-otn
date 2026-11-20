@@ -177,10 +177,20 @@ func init() {
 	cdbLock = make(map[string]*LockStruct)
 }
 
+// lockNamespace returns the namespace to lock, defaulting to "host".
+func lockNamespace(mdbNames []string) string {
+	if len(mdbNames) > 0 && mdbNames[0] != "" {
+		return mdbNames[0]
+	}
+	return "host"
+}
+
 // ConfigDBTryLock tries to acquire a lock for the given multiDbName.
 // It uses a map to store locks for multiple multiDbNames.
-func ConfigDBTryLock(token string, multiDbName string) error {
+// The namespace is optional and defaults to "host".
+func ConfigDBTryLock(token string, mdbNames ...string) error {
 	var err error
+	multiDbName := lockNamespace(mdbNames)
 	var ls map[string]*LockStruct // Local lock struct map for this invocation
 
 	glog.Infof("ConfigDBTryLock: mdbname:%v", multiDbName)
@@ -229,8 +239,10 @@ func ConfigDBTryLock(token string, multiDbName string) error {
 	return err
 }
 
-func ConfigDBUnlock(token string, multiDBName string) error {
+// ConfigDBUnlock releases the lock for the given namespace (default "host").
+func ConfigDBUnlock(token string, mdbNames ...string) error {
 	var err error
+	multiDBName := lockNamespace(mdbNames)
 	glog.Infof("ConfigDBUnlock:%v", multiDBName)
 	if bool(glog.V(3)) || !flag.Parsed() {
 		dumpStack(7, 13) // Skip the stack frames upto DeleteDB()
@@ -304,7 +316,7 @@ func dumpStack(begin, end int) {
 func getStateDB(multiDbName string) (*redis.Client, error) {
 	var client *redis.Client
 	var err error
-	if client = redis.NewClient(adjustRedisOpts(&Options{
+	if client = TransactionalRedisClientWithOpts(adjustRedisOpts(&Options{
 		DBNo: StateDB, MDBName: multiDbName})); client == nil {
 
 		glog.Error("getStateDB: Could not create redis client: STATE_DB for:", multiDbName)

@@ -100,7 +100,7 @@ func init() {
 }
 
 // HFunc gives the name of the table, and other per-table customizations.
-type HFunc func(*DB, *SKey, *Key, SEvent, string) error
+type HFunc func(*DB, *SKey, *Key, SEvent) error
 
 // SubscribeDB is the factory method to create a subscription to the DB.
 // The returned instance can only be used for Subscription.
@@ -230,7 +230,7 @@ func iSubscribeDB(opt Options, skeys []*SKey, handler interface{}) (*DB, error) 
 					if isSA {
 						hFuncSA(d, RunningConfigNotif, "", skey, &key, sevent)
 					} else {
-						hFunc(d, skey, &key, sevent, opt.MDBName)
+						hFunc(d, skey, &key, sevent)
 					}
 				}
 			}
@@ -245,7 +245,7 @@ func iSubscribeDB(opt Options, skeys []*SKey, handler interface{}) (*DB, error) 
 		if isSA {
 			hFuncSA(d, RunningConfigNotif, "", &SKey{}, &Key{}, sEvent)
 		} else {
-			hFunc(d, &SKey{}, &Key{}, sEvent, opt.MDBName)
+			hFunc(d, &SKey{}, &Key{}, sEvent)
 		}
 	}()
 

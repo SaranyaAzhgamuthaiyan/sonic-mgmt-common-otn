@@ -117,7 +117,6 @@ func compareRedisOptsString2Struct(t *testing.T, optsS string, opts *redis.Optio
 func compareRedisOptsDBRead2Struct(t *testing.T, optsS string, opts *redis.Options) {
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",

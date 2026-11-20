@@ -36,7 +36,6 @@ import (
 func newDB(dBNum DBNum) (*DB, error) {
 	d, e := NewDB(Options{
 		DBNo:                    dBNum,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",

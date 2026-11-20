@@ -298,7 +298,6 @@ func (c *CVL) ValidateEditConfig(cfgData []cmn.CVLEditConfigData) (cvlErr CVLErr
 		panic(c.dbAccess)
 	}
 
-	CVL_LOG(INFO_DEBUG, "ValidateEditConfig: Namespace:%s", c.dbAccess.GetMDBName())
 	ts := time.Now()
 
 	defer func() {

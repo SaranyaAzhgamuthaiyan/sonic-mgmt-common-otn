@@ -487,6 +487,11 @@ func NewDB(opt Options) (*DB, error) {
 
 	var e error
 
+	// Default to the host namespace so d.Opts.MDBName is never empty.
+	if opt.MDBName == "" {
+		opt.MDBName = "host"
+	}
+
 	if glog.V(3) {
 		glog.Info("NewDB: Begin: opt: ", opt)
 	}

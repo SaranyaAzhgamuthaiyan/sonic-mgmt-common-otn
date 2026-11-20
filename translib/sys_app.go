@@ -351,30 +351,3 @@ func (app *SysApp) processAction(dbs [db.MaxDB]*db.DB) (ActionResponse, error) {
 
 	return resp, err
 }
-
-func (app *SysApp) getNamespace(path string) ([]NamespacePayload, error) {
-
-	var nameSpaceList []NamespacePayload
-
-	nameSpaceList = append(nameSpaceList, NamespacePayload{
-		Namespace: "host",
-		Payloads:  []map[string]interface{}{},
-		Key:       "",
-	})
-
-	log.Infof("SysApp:getNamespace: nameSpaceList:%v ", nameSpaceList)
-
-	return nameSpaceList, nil
-}
-
-func (app *SysApp) processPreparePhase(d *db.DB, ckey string) error {
-	return nil
-}
-
-func (app *SysApp) rollback(d *db.DB) error {
-	return nil
-}
-
-func (app *SysApp) processCVLValidate(d *db.DB) error {
-	return nil
-}

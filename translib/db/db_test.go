@@ -119,7 +119,6 @@ var dbOnC *DB
 func newReadOnlyDB(dBNum DBNum) (*DB, error) {
 	d, e := NewDB(Options{
 		DBNo:                    dBNum,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -133,7 +132,6 @@ func newReadOnlyDB(dBNum DBNum) (*DB, error) {
 func newOnCDB(dBNum DBNum) (*DB, error) {
 	d, e := NewDB(Options{
 		DBNo:                    dBNum,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -273,7 +271,6 @@ func TestNoTransaction(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -341,7 +338,6 @@ func TestTable(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -527,7 +523,6 @@ func TestTransactionCacheWithDBContentKeysPattern(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -626,7 +621,6 @@ func TestTransactionCacheMultiKeysPattern(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -725,7 +719,6 @@ func TestTransactionCacheWithDBContentKeys(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -803,7 +796,6 @@ func TestTransactionCacheWithDBContentDel(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -879,7 +871,6 @@ func TestTransactionCacheWithDBContentDelFields(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -962,7 +953,6 @@ func TestTransactionCacheWithDBContentMod(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -1044,7 +1034,6 @@ func TestTransactionCacheWithDBContentSet(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -1247,7 +1236,6 @@ func testTransactionCache(t *testing.T, transRun TransRun) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -1522,7 +1510,6 @@ func testTransaction(t *testing.T, transRun TransRun) {
 
 	d, e := NewDB(Options{
 		DBNo:               ConfigDB,
-		MDBName:            hostDBName,
 		InitIndicator:      "",
 		TableNameSeparator: "|",
 		KeySeparator:       "|",
@@ -1631,7 +1618,6 @@ func testTransaction(t *testing.T, transRun TransRun) {
 	case TransRunFailWatchKeys, TransRunFailTable:
 		d2, e2 := NewDB(Options{
 			DBNo:                    ConfigDB,
-			MDBName:                 hostDBName,
 			InitIndicator:           "",
 			TableNameSeparator:      "|",
 			KeySeparator:            "|",
@@ -1687,7 +1673,6 @@ func TestMap(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -1733,7 +1718,6 @@ func TestSubscribe(t *testing.T) {
 
 	d, e := NewDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -1763,7 +1747,6 @@ func TestSubscribe(t *testing.T) {
 
 	s, e := SubscribeDB(Options{
 		DBNo:                    ConfigDB,
-		MDBName:                 hostDBName,
 		InitIndicator:           "",
 		TableNameSeparator:      "|",
 		KeySeparator:            "|",
@@ -1771,7 +1754,7 @@ func TestSubscribe(t *testing.T) {
 		ForceNewRedisConnection: true,
 	}, skeys, func(s *DB,
 		skey *SKey, key *Key,
-		event SEvent, dbName string) error {
+		event SEvent) error {
 		switch event {
 		case SEventHSet:
 			hSetCalled = true
