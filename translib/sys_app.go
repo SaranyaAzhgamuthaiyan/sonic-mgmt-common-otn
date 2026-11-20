@@ -52,7 +52,7 @@ type dbEntry struct {
 
 func init() {
 	log.Info("SysApp: Init called for System module")
-	err := register("/openconfig-system:system/processes",
+	err := register("/openconfig-system:system",
 		&appInfo{appType: reflect.TypeOf(SysApp{}),
 			ygotRootType: reflect.TypeOf(ocbinds.OpenconfigSystem_System{}),
 			isNative:     false})

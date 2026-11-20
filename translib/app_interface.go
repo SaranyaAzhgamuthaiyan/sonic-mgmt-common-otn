@@ -215,10 +215,7 @@ func getAppModuleInfo(path string) (*appInfo, error) {
 	log.Info("getAppModule called for path =", path)
 
 	for pattern, app := range appMap {
-		if pattern == "/openconfig-platform:components" && (strings.Contains(path, "/openconfig-transport-line-common:optical-port") || strings.Contains(path, "/openconfig-terminal-device:optical-channel") || strings.Contains(path, "FAN") || strings.Contains(path, "PSU") || strings.Contains(path, "CU") || strings.Contains(path, "CHASSIS") || strings.Contains(path, "LINECARD")) {
-			continue
-
-		} else if !strings.HasPrefix(path, pattern) {
+		if !strings.HasPrefix(path, pattern) {
 			continue
 		}
 
