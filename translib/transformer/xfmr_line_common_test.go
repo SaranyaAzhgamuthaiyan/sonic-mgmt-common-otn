@@ -25,7 +25,7 @@ func Test_port_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 
 		/* PORT State DB test */
 		t.Log("\n\n+++++++++++++ Performing Get on stateDB PORT Key ++++++++++++")
@@ -37,7 +37,7 @@ func Test_port_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.StateDB, pre_req_map)
+		loadMdbDB(dbName, db.StateDB, pre_req_map)
 		expected_get_json := "{\"openconfig-transport-line-common:state\":{\"admin-state\":\"ENABLED\",\"optical-port-type\":\"openconfig-transport-types:ADD\"}}"
 		url = fmt.Sprintf("/openconfig-platform:components/component[name=PORT-1-%d-L1IN]/port/openconfig-transport-line-common:optical-port/state", idx+1)
 
@@ -63,7 +63,7 @@ func Test_port_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.CountersDB, pre_req_map)
+		loadMdbDB(dbName, db.CountersDB, pre_req_map)
 		expected_get_json = "{\"openconfig-transport-line-common:input-power\":{\"avg\":\"11.12\",\"instant\":\"1.5\",\"interval\":\"900000000000\",\"max\":\"10.5\",\"max-time\":\"1680168600865596372\",\"min\":\"5.4\",\"min-time\":\"1680168600865596372\"}}"
 		url = fmt.Sprintf("/openconfig-platform:components/component[name=PORT-1-%d-L1IN]/port/openconfig-transport-line-common:optical-port/state/input-power", idx+1)
 
@@ -77,18 +77,18 @@ func Test_port_config_state_counter_DB_key(t *testing.T) {
 				fmt.Sprintf("PORT-1-%d-L1IN", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.ConfigDB, cleanuptbl)
+		unloadMdbDB(dbName, db.ConfigDB, cleanuptbl)
 		cleanupstatetbl = map[string]interface{}{
 			"PORT_TABLE": map[string]interface{}{
 				fmt.Sprintf("PORT-1-%d-L1IN", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.StateDB, cleanupstatetbl)
+		unloadMdbDB(dbName, db.StateDB, cleanupstatetbl)
 		cleanupcountertbl = map[string]interface{}{
 			"PORT": map[string]interface{}{
 				fmt.Sprintf("PORT-1-%d-L1IN_InputPower:15_pm_current", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.CountersDB, cleanupcountertbl)
+		unloadMdbDB(dbName, db.CountersDB, cleanupcountertbl)
 	}
 }

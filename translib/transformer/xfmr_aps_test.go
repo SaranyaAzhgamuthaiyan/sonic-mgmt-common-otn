@@ -25,7 +25,7 @@ func Test_aps_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_get_json = []string{fmt.Sprintf("{\"openconfig-transport-line-protection:config\":{\"force-to-port\":\"PRIMARY\",\"name\":\"APS-1-%d-2\"}}", idx+1)}
 		url = []string{fmt.Sprintf("/openconfig-transport-line-protection:aps/aps-modules/aps-module[name=APS-1-%d-2]/config", idx+1)}
 
@@ -58,7 +58,7 @@ func Test_aps_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.StateDB, pre_req_map)
+		loadMdbDB(dbName, db.StateDB, pre_req_map)
 		expected_get_json = []string{
 			fmt.Sprintf("{\"openconfig-transport-line-protection:state\":{\"active-path\":\"openconfig-transport-line-protection:PRIMARY\",\"force-to-port\":\"NONE\",\"hold-off-time\":5,\"name\":\"APS-1-%d-2\",\"primary-switch-hysteresis\":\"3.5\",\"primary-switch-threshold\":\"1.5\",\"relative-switch-threshold\":\"4.5\",\"relative-switch-threshold-offset\":\"6.7\",\"revertive\":true,\"secondary-switch-threshold\":\"2.4\",\"wait-to-restore-time\":10}}", idx+1),
 			"{\"openconfig-transport-line-protection:state\":{\"attenuation\":\"10.5\",\"enabled\":true,\"target-attenuation\":\"6.1\"}}",
@@ -92,7 +92,7 @@ func Test_aps_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.CountersDB, pre_req_map)
+		loadMdbDB(dbName, db.CountersDB, pre_req_map)
 		expected_get_json = []string{"{\"openconfig-transport-line-protection:optical-power\":{\"avg\":\"0.55\",\"instant\":\"0.55\",\"interval\":\"86400000000000\",\"max\":\"0.6\",\"max-time\":\"1680136923116487196\",\"min\":\"0.55\",\"min-time\":\"1680134400477338361\"}}"}
 		url = []string{fmt.Sprintf("/openconfig-transport-line-protection:aps/aps-modules/aps-module[name=APS-1-%d-2]/ports/common-in/state/optical-power", idx+1)}
 
@@ -106,20 +106,20 @@ func Test_aps_config_state_counter_DB_key(t *testing.T) {
 				fmt.Sprintf("APS-1-%d-2", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.ConfigDB, cleanuptbl)
+		unloadMdbDB(dbName, db.ConfigDB, cleanuptbl)
 
 		cleanupstatetbl = map[string]interface{}{
 			"APS_TABLE":      map[string]interface{}{fmt.Sprintf("APS-1-%d-2", idx+1): ""},
 			"APS_PORT_TABLE": map[string]interface{}{fmt.Sprintf("APS-1-%d-2_CommonIn", idx+1): ""},
 		}
-		unloadDB(dbName, db.StateDB, cleanupstatetbl)
+		unloadMdbDB(dbName, db.StateDB, cleanupstatetbl)
 
 		cleanupcountertbl = map[string]interface{}{
 			"APS_PORT": map[string]interface{}{
 				fmt.Sprintf("APS-1-%d-2_CommonIn_OpticalPower:15_pm_current", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.CountersDB, cleanupcountertbl)
+		unloadMdbDB(dbName, db.CountersDB, cleanupcountertbl)
 	}
 }
 
@@ -138,7 +138,7 @@ func Test_set_aps_config_DB_key_and_field_xfmr(t *testing.T) {
 			},
 		}
 
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_map := map[string]interface{}{
 			"APS": map[string]interface{}{
 				fmt.Sprintf("APS-1-%d-2", idx+1): map[string]interface{}{

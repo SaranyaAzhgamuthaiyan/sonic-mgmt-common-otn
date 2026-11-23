@@ -28,7 +28,7 @@ func Test_alarm_state_DB_key(t *testing.T) {
 			},
 		},
 	}
-	loadDB(hostDBName, db.StateDB, pre_req_map)
+	loadMdbDB(hostDBName, db.StateDB, pre_req_map)
 	expected_get_json := "{\"openconfig-system:alarm\":[{\"id\":\"ALARM1\",\"state\":{\"id\":\"ALARM1\",\"resource\":\"test_res\",\"severity\":\"openconfig-alarm-types:CRITICAL\",\"text\":\"test_text\",\"time-created\":\"12\",\"type-id\":\"openconfig-alarm-types:EQPT\"}}]}"
 	url = "/openconfig-system:system/alarms/alarm[id=ALARM1]"
 	t.Run("Test get on state DB ALARM Key", processGetRequest(url, nil, expected_get_json, false))
@@ -41,5 +41,5 @@ func Test_alarm_state_DB_key(t *testing.T) {
 			"ALARM1": "",
 		},
 	}
-	unloadDB(hostDBName, db.StateDB, cleanupstatetbl)
+	unloadMdbDB(hostDBName, db.StateDB, cleanupstatetbl)
 }

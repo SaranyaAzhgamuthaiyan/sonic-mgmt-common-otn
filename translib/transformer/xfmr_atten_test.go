@@ -29,7 +29,7 @@ func Test_get_attenuator_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_get_json := fmt.Sprintf("{\"openconfig-optical-attenuator:config\":{\"attenuation\":\"1.5\",\"attenuation-mode\":\"openconfig-optical-attenuator:CONSTANT_ATTENUATION\",\"enabled\":true,\"name\":\"ATTENUATOR-1-%d-3\",\"target-output-power\":\"2.5\"}}", idx+1)
 		url = fmt.Sprintf("/openconfig-optical-attenuator:optical-attenuator/attenuators/attenuator[name=ATTENUATOR-1-%d-3]/config", idx+1)
 
@@ -54,7 +54,7 @@ func Test_get_attenuator_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.StateDB, pre_req_map)
+		loadMdbDB(dbName, db.StateDB, pre_req_map)
 		expected_get_json = fmt.Sprintf("{\"openconfig-optical-attenuator:state\":{\"attenuation\":\"2.5\",\"attenuation-mode\":\"openconfig-optical-attenuator:CONSTANT_ATTENUATION\",\"component\":\"ATTENUATOR-1-%d-3\",\"egress-port\":\"PORT-1-2-2-VOAOUT\",\"enabled\":true,\"ingress-port\":\"PORT-1-2-2-VOAIN\",\"name\":\"ATTENUATOR-1-%d-3\",\"target-output-power\":\"1.5\"}}", idx+1, idx+1)
 		url = fmt.Sprintf("/openconfig-optical-attenuator:optical-attenuator/attenuators/attenuator[name=ATTENUATOR-1-%d-3]/state", idx+1)
 		t.Run("Test get on StateDB Attnuator Key ", processGetRequest(url, nil, expected_get_json, false))
@@ -79,7 +79,7 @@ func Test_get_attenuator_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.CountersDB, pre_req_map)
+		loadMdbDB(dbName, db.CountersDB, pre_req_map)
 		expected_get_json = "{\"openconfig-optical-attenuator:output-power-total\":{\"avg\":\"5.5\",\"instant\":\"2.5\",\"interval\":\"900000000000\",\"max\":\"10.2\",\"max-time\":\"1680168600865596372\",\"min\":\"5.1\",\"min-time\":\"1680168600865596372\"}}"
 		url = fmt.Sprintf("/openconfig-optical-attenuator:optical-attenuator/attenuators/attenuator[name=ATTENUATOR-1-%d-3]/state/output-power-total", idx+1)
 		t.Run("Test get on StateDB Attnuator Key-Xfmr and Field-Xfmr.", processGetRequest(url, nil, expected_get_json, false))
@@ -92,21 +92,21 @@ func Test_get_attenuator_config_state_counter_DB_key(t *testing.T) {
 				fmt.Sprintf("ATTENUATOR-1-%d-3", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.ConfigDB, cleanuptbl)
+		unloadMdbDB(dbName, db.ConfigDB, cleanuptbl)
 
 		cleanupstatetbl = map[string]interface{}{
 			"OTN_ATTENUATOR_TABLE": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-3", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.StateDB, cleanupstatetbl)
+		unloadMdbDB(dbName, db.StateDB, cleanupstatetbl)
 
 		cleanupcountertbl = map[string]interface{}{
 			"OTN_ATTENUATOR": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-3_OutputPowerTotal:15_pm_current", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.CountersDB, cleanupcountertbl)
+		unloadMdbDB(dbName, db.CountersDB, cleanupcountertbl)
 	}
 }
 
@@ -126,7 +126,7 @@ func Test_set_attenuator_config_DB_key_and_field_xfmr(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_map := map[string]interface{}{
 			"OTN_ATTENUATOR": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-3", idx+1): map[string]interface{}{

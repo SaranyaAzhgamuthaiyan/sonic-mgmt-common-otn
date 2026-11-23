@@ -44,7 +44,7 @@ func Test_media_channel_config_state_DB_key(t *testing.T) {
 			},
 		}
 
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_get_json = []string{
 			fmt.Sprintf("{\"openconfig-wavelength-router:config\":{\"admin-status\":\"ENABLED\",\"ase-control-mode\":\"openconfig-wavelength-router:ASE_ENABLED\",\"ase-injection-threshold\":\"10\",\"attenuation-control-mode\":\"openconfig-wavelength-router:ATTENUATION_FIXED_LOSS\",\"index\":%d10,\"lower-frequency\":\"193775000\",\"name\":\"Channel\",\"super-channel\":true,\"super-channel-parent\":1,\"upper-frequency\":\"193775000\"}}", idx+1),
 			"{\"openconfig-wavelength-router:config\":{\"lower-frequency\":\"193775000\",\"target-power\":\"-5\",\"upper-frequency\":\"193775000\"}}",
@@ -92,7 +92,7 @@ func Test_media_channel_config_state_DB_key(t *testing.T) {
 			},
 		}
 
-		loadDB(dbName, db.StateDB, pre_req_map)
+		loadMdbDB(dbName, db.StateDB, pre_req_map)
 		expected_get_json = []string{
 			fmt.Sprintf("{\"openconfig-wavelength-router:state\":{\"admin-status\":\"ENABLED\",\"ase-control-mode\":\"openconfig-wavelength-router:ASE_ENABLED\",\"ase-injection-delta\":\"2\",\"ase-injection-mode\":\"MODE_THRESHOLD\",\"ase-injection-threshold\":\"10\",\"ase-status\":\"PRESENT\",\"attenuation-control-mode\":\"openconfig-wavelength-router:ATTENUATION_FIXED_LOSS\",\"index\":%d10,\"lower-frequency\":\"193775000\",\"name\":\"WavelengthRouter1\",\"oper-status\":\"UP\",\"super-channel\":false,\"super-channel-parent\":0,\"upper-frequency\":\"193775000\"}}", idx+1),
 			"{\"openconfig-wavelength-router:state\":{\"lower-frequency\":\"193775000\",\"target-power\":\"-5\",\"upper-frequency\":\"193775000\"}}",
@@ -116,7 +116,7 @@ func Test_media_channel_config_state_DB_key(t *testing.T) {
 				fmt.Sprintf("%d10|193775000|193775000", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.ConfigDB, cleanuptbl)
+		unloadMdbDB(dbName, db.ConfigDB, cleanuptbl)
 
 		cleanupstatetbl = map[string]interface{}{
 			"MEDIA_CHANNEL_TABLE": map[string]interface{}{
@@ -126,7 +126,7 @@ func Test_media_channel_config_state_DB_key(t *testing.T) {
 				fmt.Sprintf("%d10|193775000|193775000", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.StateDB, cleanupstatetbl)
+		unloadMdbDB(dbName, db.StateDB, cleanupstatetbl)
 	}
 }
 
@@ -152,7 +152,7 @@ func Test_set_media_channel_config_DB_key_and_field_xfmr(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_map := map[string]interface{}{
 			"MEDIA_CHANNEL": map[string]interface{}{
 				fmt.Sprintf("%d10", idx+1): map[string]interface{}{

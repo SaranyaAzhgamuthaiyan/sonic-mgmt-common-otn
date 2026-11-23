@@ -32,7 +32,7 @@ func Test_pfm_transceiver_config_state_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_get_json = []string{"{\"openconfig-platform-transceiver:config\":{\"enabled\":true,\"ethernet-pmd-preconf\":\"openconfig-transport-types:ETH_100GBASE_SR10\",\"fec-mode\":\"openconfig-platform-types:FEC_AUTO\"}}"}
 
 		url = []string{fmt.Sprintf("/openconfig-platform:components/component[name=TRANSCEIVER-1-%d-C2]/openconfig-platform-transceiver:transceiver/config", idx+1)}
@@ -66,7 +66,7 @@ func Test_pfm_transceiver_config_state_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.StateDB, pre_req_map)
+		loadMdbDB(dbName, db.StateDB, pre_req_map)
 		expected_get_json = []string{
 			"{\"openconfig-platform-transceiver:state\":{\"connector-type\":\"openconfig-transport-types:LC_CONNECTOR\",\"date-code\":\"2024-10-03\",\"enabled\":true,\"ethernet-pmd\":\"openconfig-transport-types:ETH_100GBASE_CWDM4\",\"fault-condition\":false,\"fec-mode\":\"openconfig-platform-types:FEC_ENABLED\",\"form-factor\":\"openconfig-transport-types:QSFP28\",\"present\":\"PRESENT\",\"vendor\":\"VendorX\",\"vendor-part\":\"VX-1234\",\"vendor-rev\":\"1.0\"}}",
 			"{\"openconfig-platform-transceiver:state\":{\"index\":1,\"output-frequency\":\"193000000\",\"tx-laser\":true}}",
@@ -91,7 +91,7 @@ func Test_pfm_transceiver_config_state_DB_key(t *testing.T) {
 				fmt.Sprintf("TRANSCEIVER-1-%d-C2", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.ConfigDB, cleanuptbl)
+		unloadMdbDB(dbName, db.ConfigDB, cleanuptbl)
 
 		cleanupstatetbl = map[string]interface{}{
 			"TRANSCEIVER_TABLE": map[string]interface{}{
@@ -101,7 +101,7 @@ func Test_pfm_transceiver_config_state_DB_key(t *testing.T) {
 				fmt.Sprintf("TRANSCEIVER-1-%d-C2|CH-1", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.StateDB, cleanupstatetbl)
+		unloadMdbDB(dbName, db.StateDB, cleanupstatetbl)
 	}
 }
 
@@ -136,7 +136,7 @@ func Test_fan_state_DB_key(t *testing.T) {
 			"FAN-1-7": pfmValues,
 		},
 	}
-	loadDB(hostDBName, db.ConfigDB, pre_req_map)
+	loadMdbDB(hostDBName, db.ConfigDB, pre_req_map)
 
 	pre_req_map = map[string]interface{}{
 		"FAN_TABLE": map[string]interface{}{
@@ -144,7 +144,7 @@ func Test_fan_state_DB_key(t *testing.T) {
 		},
 	}
 	time.Sleep(1 * time.Second)
-	loadDB(hostDBName, db.StateDB, pre_req_map)
+	loadMdbDB(hostDBName, db.StateDB, pre_req_map)
 	expected_get_json = "{\"openconfig-platform:state\":{\"empty\":false,\"hardware-version\":\"test_hw_version\",\"memory\":{\"available\":\"100\",\"utilized\":\"200\"},\"mfg-date\":\"09-10-24\",\"mfg-name\":\"test_mfg_name\",\"name\":\"FAN-1-7\",\"oper-status\":\"openconfig-platform-types:ACTIVE\",\"parent\":\"ACTIVE\",\"part-no\":\"10\",\"removable\":true,\"serial-no\":\"test_serial_no\",\"software-version\":\"test_software_version\"}}"
 	url = "/openconfig-platform:components/component[name=FAN-1-7]/state"
 	t.Run("Test get on state DB FAN Key for "+url, processGetRequest(url, nil, expected_get_json, false))
@@ -157,13 +157,13 @@ func Test_fan_state_DB_key(t *testing.T) {
 			"FAN-1-7": "",
 		},
 	}
-	unloadDB(hostDBName, db.ConfigDB, cleanuptbl)
+	unloadMdbDB(hostDBName, db.ConfigDB, cleanuptbl)
 	cleanupstatetbl = map[string]interface{}{
 		"FAN_TABLE": map[string]interface{}{
 			"FAN-1-7": "",
 		},
 	}
-	unloadDB(hostDBName, db.StateDB, cleanupstatetbl)
+	unloadMdbDB(hostDBName, db.StateDB, cleanupstatetbl)
 }
 
 /* PSU state DB fields and values */
@@ -180,7 +180,7 @@ func Test_psu_state_DB_key(t *testing.T) {
 			"PSU-1-5": pfmValues,
 		},
 	}
-	loadDB(hostDBName, db.ConfigDB, pre_req_map)
+	loadMdbDB(hostDBName, db.ConfigDB, pre_req_map)
 
 	pre_req_map = map[string]interface{}{
 		"PSU_TABLE": map[string]interface{}{
@@ -188,7 +188,7 @@ func Test_psu_state_DB_key(t *testing.T) {
 		},
 	}
 	time.Sleep(1 * time.Second)
-	loadDB(hostDBName, db.StateDB, pre_req_map)
+	loadMdbDB(hostDBName, db.StateDB, pre_req_map)
 	expected_get_json = "{\"openconfig-platform:state\":{\"empty\":false,\"hardware-version\":\"test_hw_version\",\"memory\":{\"available\":\"100\",\"utilized\":\"200\"},\"mfg-date\":\"09-10-24\",\"mfg-name\":\"test_mfg_name\",\"name\":\"PSU-1-5\",\"oper-status\":\"openconfig-platform-types:ACTIVE\",\"parent\":\"ACTIVE\",\"part-no\":\"10\",\"removable\":true,\"serial-no\":\"test_serial_no\",\"software-version\":\"test_software_version\"}}"
 	url = "/openconfig-platform:components/component[name=PSU-1-5]/state"
 	t.Run("Test get on state DB PSU Key for "+url, processGetRequest(url, nil, expected_get_json, false))
@@ -201,13 +201,13 @@ func Test_psu_state_DB_key(t *testing.T) {
 			"PSU-1-5": "",
 		},
 	}
-	unloadDB(hostDBName, db.ConfigDB, cleanuptbl)
+	unloadMdbDB(hostDBName, db.ConfigDB, cleanuptbl)
 	cleanupstatetbl = map[string]interface{}{
 		"PSU_TABLE": map[string]interface{}{
 			"PSU-1-5": "",
 		},
 	}
-	unloadDB(hostDBName, db.StateDB, cleanupstatetbl)
+	unloadMdbDB(hostDBName, db.StateDB, cleanupstatetbl)
 }
 
 /* CU state DB fields and values */
@@ -224,7 +224,7 @@ func Test_CU_state_DB_key(t *testing.T) {
 			"CU-1": pfmValues,
 		},
 	}
-	loadDB(hostDBName, db.ConfigDB, pre_req_map)
+	loadMdbDB(hostDBName, db.ConfigDB, pre_req_map)
 
 	pre_req_map = map[string]interface{}{
 		"CU_TABLE": map[string]interface{}{
@@ -232,7 +232,7 @@ func Test_CU_state_DB_key(t *testing.T) {
 		},
 	}
 	time.Sleep(1 * time.Second)
-	loadDB(hostDBName, db.StateDB, pre_req_map)
+	loadMdbDB(hostDBName, db.StateDB, pre_req_map)
 	expected_get_json = "{\"openconfig-platform:state\":{\"empty\":false,\"hardware-version\":\"test_hw_version\",\"memory\":{\"available\":\"100\",\"utilized\":\"200\"},\"mfg-date\":\"09-10-24\",\"mfg-name\":\"test_mfg_name\",\"name\":\"CU-1\",\"oper-status\":\"openconfig-platform-types:ACTIVE\",\"parent\":\"ACTIVE\",\"part-no\":\"10\",\"removable\":true,\"serial-no\":\"test_serial_no\",\"software-version\":\"test_software_version\"}}"
 	url = "/openconfig-platform:components/component[name=CU-1]/state"
 	t.Run("Test get on state DB CU Key for "+url, processGetRequest(url, nil, expected_get_json, false))
@@ -245,13 +245,13 @@ func Test_CU_state_DB_key(t *testing.T) {
 			"CU-1": "",
 		},
 	}
-	unloadDB(hostDBName, db.ConfigDB, cleanuptbl)
+	unloadMdbDB(hostDBName, db.ConfigDB, cleanuptbl)
 	cleanupstatetbl = map[string]interface{}{
 		"CU_TABLE": map[string]interface{}{
 			"CU-1": "",
 		},
 	}
-	unloadDB(hostDBName, db.StateDB, cleanupstatetbl)
+	unloadMdbDB(hostDBName, db.StateDB, cleanupstatetbl)
 }
 
 /* chassis state DB fields and values */
@@ -268,7 +268,7 @@ func Test_chassis_state_DB_key(t *testing.T) {
 			},
 		},
 	}
-	loadDB(hostDBName, db.ConfigDB, pre_req_map)
+	loadMdbDB(hostDBName, db.ConfigDB, pre_req_map)
 
 	pre_req_map = map[string]interface{}{
 		"CHASSIS_TABLE": map[string]interface{}{
@@ -278,7 +278,7 @@ func Test_chassis_state_DB_key(t *testing.T) {
 		},
 	}
 	time.Sleep(1 * time.Second)
-	loadDB(hostDBName, db.StateDB, pre_req_map)
+	loadMdbDB(hostDBName, db.StateDB, pre_req_map)
 	expected_get_json = "{\"openconfig-platform:state\":{\"name\":\"CHASSIS-1\",\"oper-status\":\"openconfig-platform-types:ACTIVE\"}}"
 	url = "/openconfig-platform:components/component[name=CHASSIS-1]/state"
 	t.Run("Test get on state DB chassis Key for "+url, processGetRequest(url, nil, expected_get_json, false))
@@ -291,13 +291,13 @@ func Test_chassis_state_DB_key(t *testing.T) {
 			"CHASSIS-1": "",
 		},
 	}
-	unloadDB(hostDBName, db.ConfigDB, cleanuptbl)
+	unloadMdbDB(hostDBName, db.ConfigDB, cleanuptbl)
 	cleanupstatetbl = map[string]interface{}{
 		"CHASSIS_TABLE": map[string]interface{}{
 			"CHASSIS-1": "",
 		},
 	}
-	unloadDB(hostDBName, db.StateDB, cleanupstatetbl)
+	unloadMdbDB(hostDBName, db.StateDB, cleanupstatetbl)
 }
 
 func Test_set_pfm_transcevier_config_DB_key_and_field_xfmr(t *testing.T) {
@@ -324,7 +324,7 @@ func Test_set_pfm_transcevier_config_DB_key_and_field_xfmr(t *testing.T) {
 			},
 		}
 
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_map := map[string]interface{}{
 			"TRANSCEIVER": map[string]interface{}{
 				fmt.Sprintf("TRANSCEIVER-1-%d-C2", idx+1): map[string]interface{}{

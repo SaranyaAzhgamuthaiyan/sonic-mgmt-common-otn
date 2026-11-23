@@ -54,7 +54,7 @@ func Test_terminal_device_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		time.Sleep(1 * time.Second)
 		expected_get_json = []string{fmt.Sprintf("{\"openconfig-terminal-device:config\":{\"admin-state\":\"MAINT\",\"index\":%d02,\"loopback-mode\":\"NONE\",\"test-signal\":false}}", idx+1), "{\"openconfig-terminal-device:config\":{\"als-delay\":1000,\"client-als\":\"LASER_SHUTDOWN\"}}"}
 		url = []string{
@@ -134,7 +134,7 @@ func Test_terminal_device_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.StateDB, pre_req_map)
+		loadMdbDB(dbName, db.StateDB, pre_req_map)
 		time.Sleep(1 * time.Second)
 		expected_get_json = []string{
 			fmt.Sprintf("{\"openconfig-terminal-device:state\":{\"admin-state\":\"MAINT\",\"description\":\"GE-1-1-C3\",\"index\":%d02,\"link-state\":\"DOWN\",\"loopback-mode\":\"NONE\",\"rate-class\":\"openconfig-transport-types:TRIB_RATE_200G\",\"test-signal\":false,\"trib-protocol\":\"openconfig-transport-types:PROT_1GE\"}}", idx+1),
@@ -175,7 +175,7 @@ func Test_terminal_device_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.CountersDB, pre_req_map)
+		loadMdbDB(dbName, db.CountersDB, pre_req_map)
 		expected_get_json = []string{"{\"openconfig-terminal-device:state\":{\"als-delay\":1000,\"client-als\":\"LASER_SHUTDOWN\",\"in-block-errors\":\"0\",\"in-fragment-frames\":\"0\",\"in-jabber-frames\":\"0\",\"in-pcs-bip-errors\":\"0\",\"in-pcs-errored-seconds\":\"0\",\"in-pcs-severely-errored-seconds\":\"0\",\"out-block-errors\":\"0\",\"out-pcs-bip-errors\":\"0\"}}"}
 		url = []string{fmt.Sprintf("/openconfig-terminal-device:terminal-device/logical-channels/channel[index=%d02]/ethernet/state", idx+1)}
 		t.Run("Test get on counter DB Ethernet Key-Xfmr and Field-Xfmr.", processGetRequest(url[0], nil, expected_get_json[0], false))
@@ -200,7 +200,7 @@ func Test_terminal_device_config_state_counter_DB_key(t *testing.T) {
 				fmt.Sprintf("CH%d02", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.ConfigDB, cleanuptbl)
+		unloadMdbDB(dbName, db.ConfigDB, cleanuptbl)
 
 		cleanupstatetbl = map[string]interface{}{
 			"LOGICAL_CHANNEL_TABLE": map[string]interface{}{
@@ -222,14 +222,14 @@ func Test_terminal_device_config_state_counter_DB_key(t *testing.T) {
 				fmt.Sprintf("%d02", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.StateDB, cleanupstatetbl)
+		unloadMdbDB(dbName, db.StateDB, cleanupstatetbl)
 
 		cleanupcountertbl = map[string]interface{}{
 			"ETHERNET": map[string]interface{}{
 				fmt.Sprintf("CH%d02:15_pm_current", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.CountersDB, cleanupcountertbl)
+		unloadMdbDB(dbName, db.CountersDB, cleanupcountertbl)
 	}
 }
 
@@ -249,7 +249,7 @@ func Test_set_terminal_device_config_DB_key_and_field_xfmr(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_map := map[string]interface{}{
 			"LOGICAL_CHANNEL": map[string]interface{}{
 				fmt.Sprintf("CH%d02", idx+1): map[string]interface{}{

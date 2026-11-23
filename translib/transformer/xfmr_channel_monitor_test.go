@@ -26,7 +26,7 @@ func Test_channel_monitor_config_state_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_get_json = []string{
 			fmt.Sprintf("{\"openconfig-channel-monitor:config\":{\"monitor-port\":\"test_monitor_port\",\"name\":\"OCM-1-%d-2\"}}", idx+1),
 		}
@@ -52,7 +52,7 @@ func Test_channel_monitor_config_state_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.StateDB, pre_req_map)
+		loadMdbDB(dbName, db.StateDB, pre_req_map)
 		expected_get_json = []string{
 			fmt.Sprintf("{\"openconfig-channel-monitor:state\":{\"monitor-port\":\"test_monitor_port\",\"name\":\"OCM-1-%d-2\"}}", idx+1),
 			fmt.Sprintf("{\"openconfig-channel-monitor:state\":{\"lower-frequency\":\"25\",\"power\":\"5\",\"upper-frequency\":\"100\"}}"),
@@ -74,7 +74,7 @@ func Test_channel_monitor_config_state_DB_key(t *testing.T) {
 				fmt.Sprintf("OCM-1-%d-2", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.ConfigDB, cleanuptbl)
+		unloadMdbDB(dbName, db.ConfigDB, cleanuptbl)
 		cleanupstatetbl = map[string]interface{}{
 			"OTN_OCM_TABLE": map[string]interface{}{
 				fmt.Sprintf("OCM-1-%d-2", idx+1): "",
@@ -83,7 +83,7 @@ func Test_channel_monitor_config_state_DB_key(t *testing.T) {
 				fmt.Sprintf("OCM-1-%d-2|25|100", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.StateDB, cleanupstatetbl)
+		unloadMdbDB(dbName, db.StateDB, cleanupstatetbl)
 	}
 }
 
@@ -101,7 +101,7 @@ func Test_set_channel_monitor_config_DB_key_and_field_xfmr(t *testing.T) {
 			},
 		}
 
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_map := map[string]interface{}{
 			"OTN_OCM": map[string]interface{}{
 				fmt.Sprintf("OCM-1-%d-2", idx+1): map[string]interface{}{

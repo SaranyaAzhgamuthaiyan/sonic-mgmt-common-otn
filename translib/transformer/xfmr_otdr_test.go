@@ -38,7 +38,7 @@ func Test_otdr_config_state_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_get_json = []string{fmt.Sprintf("{\"openconfig-optical-time-domain-reflectometer:config\":{\"fiber-profile\":{\"backscatter-index\":\"2\",\"end-of-fiber-threshold\":\"0\",\"reflection-threshold\":\"0\",\"refractive-index\":\"0\",\"splice-loss-threshold\":\"0\"},\"name\":\"OTDR-1-%d-2\",\"parent-port\":\"test_parent_port\",\"repetition\":{\"enable\":true,\"period\":1,\"start-time\":\"0:10\"},\"scanning-profile\":{\"average-time\":2,\"distance-range\":2,\"output-frequency\":\"88\",\"pulse-width\":2}}}", idx+1)}
 
 		url = []string{fmt.Sprintf("/openconfig-optical-time-domain-reflectometer:otdrs/otdr[name=OTDR-1-%d-2]/config", idx+1)}
@@ -143,7 +143,7 @@ func Test_otdr_config_state_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.StateDB, pre_req_map)
+		loadMdbDB(dbName, db.StateDB, pre_req_map)
 		expected_get_json = []string{
 			fmt.Sprintf("{\"openconfig-optical-time-domain-reflectometer:state\":{\"fiber-profile\":{\"backscatter-index\":\"2\",\"end-of-fiber-threshold\":\"0\",\"reflection-threshold\":\"0\",\"refractive-index\":\"0\",\"splice-loss-threshold\":\"0\"},\"name\":\"OTDR-1-%d-2\",\"parent-port\":\"test_parent_port\",\"repetition\":{\"enable\":true,\"period\":1,\"start-time\":\"0:10\"},\"scanning-profile\":{\"average-time\":2,\"distance-range\":2,\"output-frequency\":\"88\",\"pulse-width\":2},\"scanning-status\":\"openconfig-platform-types:ACTIVE\",\"specification\":{\"distance-accuracy\":\"0\",\"dynamic-range\":1,\"loss-dead-zone\":\"2\",\"reflection-dead-zone\":\"2\",\"sampling-resolution\":\"2\"}}}", idx+1),
 
@@ -181,7 +181,7 @@ func Test_otdr_config_state_DB_key(t *testing.T) {
 				fmt.Sprintf("OTDR-1-%d-2", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.ConfigDB, cleanuptbl)
+		unloadMdbDB(dbName, db.ConfigDB, cleanuptbl)
 
 		cleanupstatetbl = map[string]interface{}{
 			"OTDR_TABLE": map[string]interface{}{
@@ -196,7 +196,7 @@ func Test_otdr_config_state_DB_key(t *testing.T) {
 				fmt.Sprintf("OTDR-1-%d-2|2024-06-14T15:30:45.123Z+05:30|101", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.StateDB, cleanupstatetbl)
+		unloadMdbDB(dbName, db.StateDB, cleanupstatetbl)
 	}
 }
 
@@ -226,7 +226,7 @@ func Test_set_OTDR_config_DB_key_and_field_xfmr(t *testing.T) {
 			},
 		}
 
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_map := map[string]interface{}{
 			"OTDR": map[string]interface{}{
 				fmt.Sprintf("OTDR-1-%d-2", idx+1): map[string]interface{}{
