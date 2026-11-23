@@ -164,7 +164,7 @@ var attn_name_get_namespace_xfmr GetNamespaceFunc = func(inParams XfmrParams) ([
 	log.Infof("attn_name_get_namespace_xfmr: key: %v", key)
 
 	if len(key) > 0 && key != "*" {
-		dbName := db.GetMDBNameFromEntity(key)
+		dbName := db.GetMDBNameFromOtnOpticalEntity(key)
 		log.Infof("attn_name_get_namespace_xfmr: dbName: %v", dbName)
 
 		var raw map[string]interface{}
@@ -212,7 +212,7 @@ var attn_name_get_namespace_xfmr GetNamespaceFunc = func(inParams XfmrParams) ([
 
 			for _, key := range val.MapKeys() {
 				entity := val.MapIndex(key).Interface()
-				dbName := db.GetMDBNameFromEntity(key.String())
+				dbName := db.GetMDBNameFromOtnOpticalEntity(key.String())
 
 				ygotStruct, ok := entity.(ygot.ValidatedGoStruct)
 				if !ok {
@@ -271,28 +271,17 @@ var attn_name_get_namespace_xfmr GetNamespaceFunc = func(inParams XfmrParams) ([
 	// Construct final result
 	var result []NamespacePayload
 	for ns, pwkList := range nsPayloadMap {
-		var mergedInstances []interface{}
 		var firstKey string
-		var listKey string
+		var nsPayloads []map[string]interface{}
 
 		for i, pwk := range pwkList {
 			if i == 0 {
 				firstKey = pwk.key
-				for k := range pwk.payload {
-					listKey = k
-					break
-				}
 			}
-			if listVal, ok := pwk.payload[listKey]; ok {
-				if instances, ok := listVal.([]interface{}); ok {
-					mergedInstances = append(mergedInstances, instances...)
-				}
-			}
+			nsPayloads = append(nsPayloads, pwk.payload)
 		}
 
-		mergedMap := map[string]interface{}{
-			listKey: mergedInstances,
-		}
+		mergedMap := mergeNsPayloads(nsPayloads)
 
 		result = append(result, NamespacePayload{
 			Namespace: ns,

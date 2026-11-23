@@ -20,7 +20,7 @@ func Test_get_attenuator_config_state_counter_DB_key(t *testing.T) {
 		/* ATTENUATOR Config DB test */
 		t.Log("\n\n+++++++++++++ Performing Get on configDB Attenuator Key ++++++++++++")
 		pre_req_map = map[string]interface{}{
-			"ATTENUATOR": map[string]interface{}{
+			"OTN_ATTENUATOR": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-3", idx+1): map[string]interface{}{
 					"attenuation":         "1.5",
 					"attenuation-mode":    "CONSTANT_ATTENUATION",
@@ -29,7 +29,7 @@ func Test_get_attenuator_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_get_json := fmt.Sprintf("{\"openconfig-optical-attenuator:config\":{\"attenuation\":\"1.5\",\"attenuation-mode\":\"openconfig-optical-attenuator:CONSTANT_ATTENUATION\",\"enabled\":true,\"name\":\"ATTENUATOR-1-%d-3\",\"target-output-power\":\"2.5\"}}", idx+1)
 		url = fmt.Sprintf("/openconfig-optical-attenuator:optical-attenuator/attenuators/attenuator[name=ATTENUATOR-1-%d-3]/config", idx+1)
 
@@ -40,7 +40,7 @@ func Test_get_attenuator_config_state_counter_DB_key(t *testing.T) {
 		/* ATTENUATOR State DB test */
 		t.Log("\n\n+++++++++++++ Performing Get on stateDB Attenuator Key ++++++++++++")
 		pre_req_map = map[string]interface{}{
-			"ATTENUATOR_TABLE": map[string]interface{}{
+			"OTN_ATTENUATOR_TABLE": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-3", idx+1): map[string]interface{}{
 					"attenuation":         "2.5",
 					"name":                fmt.Sprintf("ATTENUATOR-1-%d-3", idx+1),
@@ -54,7 +54,7 @@ func Test_get_attenuator_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.StateDB, pre_req_map)
+		loadMdbDB(dbName, db.StateDB, pre_req_map)
 		expected_get_json = fmt.Sprintf("{\"openconfig-optical-attenuator:state\":{\"attenuation\":\"2.5\",\"attenuation-mode\":\"openconfig-optical-attenuator:CONSTANT_ATTENUATION\",\"component\":\"ATTENUATOR-1-%d-3\",\"egress-port\":\"PORT-1-2-2-VOAOUT\",\"enabled\":true,\"ingress-port\":\"PORT-1-2-2-VOAIN\",\"name\":\"ATTENUATOR-1-%d-3\",\"target-output-power\":\"1.5\"}}", idx+1, idx+1)
 		url = fmt.Sprintf("/openconfig-optical-attenuator:optical-attenuator/attenuators/attenuator[name=ATTENUATOR-1-%d-3]/state", idx+1)
 		t.Run("Test get on StateDB Attnuator Key ", processGetRequest(url, nil, expected_get_json, false))
@@ -64,7 +64,7 @@ func Test_get_attenuator_config_state_counter_DB_key(t *testing.T) {
 		/* ATTENUATOR Counter DB test */
 		t.Log("\n\n+++++++++++++ Performing Get on CounterDB Attenuator Key ++++++++++++")
 		pre_req_map = map[string]interface{}{
-			"ATTENUATOR": map[string]interface{}{
+			"OTN_ATTENUATOR": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-3_OutputPowerTotal:15_pm_current", idx+1): map[string]interface{}{
 					"instant":          "2.5",
 					"min-time":         "1680168600865596372",
@@ -79,7 +79,7 @@ func Test_get_attenuator_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.CountersDB, pre_req_map)
+		loadMdbDB(dbName, db.CountersDB, pre_req_map)
 		expected_get_json = "{\"openconfig-optical-attenuator:output-power-total\":{\"avg\":\"5.5\",\"instant\":\"2.5\",\"interval\":\"900000000000\",\"max\":\"10.2\",\"max-time\":\"1680168600865596372\",\"min\":\"5.1\",\"min-time\":\"1680168600865596372\"}}"
 		url = fmt.Sprintf("/openconfig-optical-attenuator:optical-attenuator/attenuators/attenuator[name=ATTENUATOR-1-%d-3]/state/output-power-total", idx+1)
 		t.Run("Test get on StateDB Attnuator Key-Xfmr and Field-Xfmr.", processGetRequest(url, nil, expected_get_json, false))
@@ -88,25 +88,25 @@ func Test_get_attenuator_config_state_counter_DB_key(t *testing.T) {
 
 		/* Unload the Data */
 		cleanuptbl = map[string]interface{}{
-			"ATTENUATOR": map[string]interface{}{
+			"OTN_ATTENUATOR": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-3", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.ConfigDB, cleanuptbl)
+		unloadMdbDB(dbName, db.ConfigDB, cleanuptbl)
 
 		cleanupstatetbl = map[string]interface{}{
-			"ATTENUATOR_TABLE": map[string]interface{}{
+			"OTN_ATTENUATOR_TABLE": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-3", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.StateDB, cleanupstatetbl)
+		unloadMdbDB(dbName, db.StateDB, cleanupstatetbl)
 
 		cleanupcountertbl = map[string]interface{}{
-			"ATTENUATOR": map[string]interface{}{
+			"OTN_ATTENUATOR": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-3_OutputPowerTotal:15_pm_current", idx+1): "",
 			},
 		}
-		unloadDB(dbName, db.CountersDB, cleanupcountertbl)
+		unloadMdbDB(dbName, db.CountersDB, cleanupcountertbl)
 	}
 }
 
@@ -117,7 +117,7 @@ func Test_set_attenuator_config_DB_key_and_field_xfmr(t *testing.T) {
 		url := fmt.Sprintf("/openconfig-optical-attenuator:optical-attenuator/attenuators/attenuator[name=ATTENUATOR-1-%d-3]/config", idx+1)
 		url_body_json := "{\"config\":{\"attenuation\":\"1.5\",\"attenuation-mode\":\"CONSTANT_ATTENUATION\",\"enabled\":true,\"target-output-power\":\"2.5\"}}"
 		pre_req_map := map[string]interface{}{
-			"ATTENUATOR": map[string]interface{}{
+			"OTN_ATTENUATOR": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-3", idx+1): map[string]interface{}{
 					"attenuation":         "12.5",
 					"attenuation-mode":    "CONSTANT_POWER",
@@ -126,9 +126,9 @@ func Test_set_attenuator_config_DB_key_and_field_xfmr(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_map := map[string]interface{}{
-			"ATTENUATOR": map[string]interface{}{
+			"OTN_ATTENUATOR": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-3", idx+1): map[string]interface{}{
 					"attenuation":         "1.5",
 					"attenuation-mode":    "CONSTANT_ATTENUATION",
@@ -144,7 +144,7 @@ func Test_set_attenuator_config_DB_key_and_field_xfmr(t *testing.T) {
 		time.Sleep(1 * time.Second)
 
 		//GET Test
-		t.Run("Verify replace on ATTENUATOR yang", verifyDbResult(rclient[dbName], fmt.Sprintf("ATTENUATOR|ATTENUATOR-1-%d-3", idx+1), expected_map, false))
+		t.Run("Verify replace on ATTENUATOR yang", verifyDbResult(rclientNs[dbName], fmt.Sprintf("OTN_ATTENUATOR|ATTENUATOR-1-%d-3", idx+1), expected_map, false))
 		time.Sleep(1 * time.Second)
 
 		//Delete Test
@@ -159,7 +159,7 @@ func Test_set_attenuator_config_DB_key_and_field_xfmr(t *testing.T) {
 		time.Sleep(1 * time.Second)
 
 		expected_map = map[string]interface{}{
-			"ATTENUATOR": map[string]interface{}{
+			"OTN_ATTENUATOR": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-21", idx+1): map[string]interface{}{
 					"attenuation":         "44.44",
 					"attenuation-mode":    "CONSTANT_POWER",
@@ -170,7 +170,7 @@ func Test_set_attenuator_config_DB_key_and_field_xfmr(t *testing.T) {
 		}
 
 		//Verify After the POST test
-		t.Run("Verify After the POST test on ATTENUATOR yang", verifyDbResult(rclient[dbName], fmt.Sprintf("ATTENUATOR|ATTENUATOR-1-%d-21", idx+1), expected_map, false))
+		t.Run("Verify After the POST test on ATTENUATOR yang", verifyDbResult(rclientNs[dbName], fmt.Sprintf("OTN_ATTENUATOR|ATTENUATOR-1-%d-21", idx+1), expected_map, false))
 
 		//Delete After the POST test
 		url = fmt.Sprintf("/openconfig-optical-attenuator:optical-attenuator/attenuators/attenuator[name=ATTENUATOR-1-%d-21]/config", idx+1)
@@ -183,7 +183,7 @@ func Test_set_attenuator_config_DB_key_and_field_xfmr(t *testing.T) {
 		t.Run("Create test on ATTENUATOR yang", processSetRequest(url, Bulk_post_payload, "POST", false))
 
 		expected_map = map[string]interface{}{
-			"ATTENUATOR": map[string]interface{}{
+			"OTN_ATTENUATOR": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-23", idx+1): map[string]interface{}{
 					"attenuation":         "4.4",
 					"attenuation-mode":    "CONSTANT_POWER",
@@ -195,10 +195,10 @@ func Test_set_attenuator_config_DB_key_and_field_xfmr(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 		//Verify After the Bulk test
-		t.Run("Verify After the Bulk test on ATTENUATOR yang", verifyDbResult(rclient[dbName], fmt.Sprintf("ATTENUATOR|ATTENUATOR-1-%d-23", idx+1), expected_map, false))
+		t.Run("Verify After the Bulk test on ATTENUATOR yang", verifyDbResult(rclientNs[dbName], fmt.Sprintf("OTN_ATTENUATOR|ATTENUATOR-1-%d-23", idx+1), expected_map, false))
 
 		expected_map = map[string]interface{}{
-			"ATTENUATOR": map[string]interface{}{
+			"OTN_ATTENUATOR": map[string]interface{}{
 				fmt.Sprintf("ATTENUATOR-1-%d-22", idx+1): map[string]interface{}{
 					"attenuation":         "44.44",
 					"attenuation-mode":    "CONSTANT_POWER",
@@ -210,7 +210,7 @@ func Test_set_attenuator_config_DB_key_and_field_xfmr(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 		//Verify After the POST test
-		t.Run("Verify After the Bulk test on ATTENUATOR yang", verifyDbResult(rclient[dbName], fmt.Sprintf("ATTENUATOR|ATTENUATOR-1-%d-22", idx+1), expected_map, false))
+		t.Run("Verify After the Bulk test on ATTENUATOR yang", verifyDbResult(rclientNs[dbName], fmt.Sprintf("OTN_ATTENUATOR|ATTENUATOR-1-%d-22", idx+1), expected_map, false))
 
 		//Delete keys After the Bulk Test
 		url = fmt.Sprintf("/openconfig-optical-attenuator:optical-attenuator/attenuators/attenuator[name=ATTENUATOR-1-%d-22]/config", idx+1)

@@ -19,7 +19,7 @@ func Test_amplifier_config_state_counter_DB_key(t *testing.T) {
 		/* AMPLIFIER Config DB test */
 		t.Log("\n\n+++++++++++++ Performing Get on configDB AMPLIFIER Key ++++++++++++")
 		pre_req_map = map[string]interface{}{
-			"AMPLIFIER": map[string]interface{}{
+			"OTN_OA": map[string]interface{}{
 				fmt.Sprintf("AMPLIFIER-1-%d-2", idx+1): map[string]interface{}{
 					"type":                "EDFA",
 					"target-gain":         15.5,
@@ -35,7 +35,7 @@ func Test_amplifier_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_get_json = []string{fmt.Sprintf("{\"openconfig-optical-amplifier:config\":{\"amp-mode\":\"openconfig-optical-amplifier:CONSTANT_GAIN\",\"enabled\":true,\"fiber-type-profile\":\"openconfig-optical-amplifier:SSMF\",\"gain-range\":\"openconfig-optical-amplifier:MID_GAIN_RANGE\",\"max-gain\":\"20\",\"max-output-power\":\"5\",\"min-gain\":\"10\",\"name\":\"AMPLIFIER-1-%d-2\",\"target-gain\":\"15.5\",\"target-gain-tilt\":\"2.5\",\"target-output-power\":\"0\",\"type\":\"openconfig-optical-amplifier:EDFA\"}}", idx+1)}
 
 		url = []string{fmt.Sprintf("/openconfig-optical-amplifier:optical-amplifier/amplifiers/amplifier[name=AMPLIFIER-1-%d-2]/config", idx+1)}
@@ -46,7 +46,7 @@ func Test_amplifier_config_state_counter_DB_key(t *testing.T) {
 		/* AMPLIFIER and OSC State DB test */
 		t.Log("\n\n+++++++++++++ Performing Get on stateDB AMPLIFIER , OSC Key ++++++++++++")
 		pre_req_map = map[string]interface{}{
-			"AMPLIFIER_TABLE": map[string]interface{}{
+			"OTN_OA_TABLE": map[string]interface{}{
 				fmt.Sprintf("AMPLIFIER-1-%d-2", idx+1): map[string]interface{}{
 					"component":           fmt.Sprintf("AMPLIFIER-1-%d-2", idx+1),
 					"location":            "1-4",
@@ -66,13 +66,13 @@ func Test_amplifier_config_state_counter_DB_key(t *testing.T) {
 					"type":                "EDFA",
 				},
 			},
-			"OSC_TABLE": map[string]interface{}{
+			"OTN_OSC_TABLE": map[string]interface{}{
 				fmt.Sprintf("OSC-1-%d-2", idx+1): map[string]interface{}{
 					"output-frequency": "198538051",
 				},
 			},
 		}
-		loadDB(dbName, db.StateDB, pre_req_map)
+		loadMdbDB(dbName, db.StateDB, pre_req_map)
 		expected_get_json = []string{fmt.Sprintf("{\"openconfig-optical-amplifier:state\":{\"amp-mode\":\"openconfig-optical-amplifier:CONSTANT_POWER\",\"component\":\"AMPLIFIER-1-%d-2\",\"egress-port\":\"test data\",\"enabled\":true,\"fiber-type-profile\":\"openconfig-optical-amplifier:DSF\",\"gain-range\":\"openconfig-optical-amplifier:LOW_GAIN_RANGE\",\"ingress-port\":\"test data\",\"max-gain\":\"10.5\",\"max-output-power\":\"11.2\",\"min-gain\":\"5.6\",\"name\":\"AMPLIFIER-1-%d-2\",\"target-gain\":\"11.15\",\"target-gain-tilt\":\"16.1\",\"target-output-power\":\"10.3\",\"type\":\"openconfig-optical-amplifier:EDFA\"}}", idx+1, idx+1), fmt.Sprintf("{\"openconfig-optical-amplifier:state\":{\"interface\":\"OSC-1-%d-2\",\"output-frequency\":\"198538051\"}}", idx+1)}
 		url = []string{
 			fmt.Sprintf("/openconfig-optical-amplifier:optical-amplifier/amplifiers/amplifier[name=AMPLIFIER-1-%d-2]/state", idx+1),
@@ -90,7 +90,7 @@ func Test_amplifier_config_state_counter_DB_key(t *testing.T) {
 		/* AMPLIFIER and OSC counters DB test */
 		t.Log("\n\n+++++++++++++ Performing Get on counters AMPLIFIER , OSC Key ++++++++++++")
 		pre_req_map = map[string]interface{}{
-			"AMPLIFIER": map[string]interface{}{
+			"OTN_OA": map[string]interface{}{
 				fmt.Sprintf("AMPLIFIER-1-%d-2_ActualGain:15_pm_current", idx+1): map[string]interface{}{
 					"interval":         "86400000000000",
 					"starttime":        "1709251200000000000",
@@ -119,7 +119,7 @@ func Test_amplifier_config_state_counter_DB_key(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.CountersDB, pre_req_map)
+		loadMdbDB(dbName, db.CountersDB, pre_req_map)
 		expected_get_json = []string{"{\"openconfig-optical-amplifier:actual-gain\":{\"avg\":\"1\",\"instant\":\"1\",\"interval\":\"86400000000000\",\"max\":\"1\",\"max-time\":\"1909276854829015912\",\"min\":\"1\",\"min-time\":\"1909276854829015912\"}}", "{\"openconfig-optical-amplifier:output-power\":{\"avg\":\"2.32\",\"instant\":\"2.29\",\"interval\":\"900000000000\",\"max\":\"2.5\",\"max-time\":\"1680168786273045375\",\"min\":\"2.12\",\"min-time\":\"1680168676158235913\"}}"}
 
 		url = []string{
@@ -134,21 +134,21 @@ func Test_amplifier_config_state_counter_DB_key(t *testing.T) {
 
 		//Unload the Data
 		cleanuptbl = map[string]interface{}{
-			"AMPLIFIER": map[string]interface{}{fmt.Sprintf("AMPLIFIER-1-%d-2", idx+1): ""},
+			"OTN_OA": map[string]interface{}{fmt.Sprintf("AMPLIFIER-1-%d-2", idx+1): ""},
 		}
-		unloadDB(dbName, db.ConfigDB, cleanuptbl)
+		unloadMdbDB(dbName, db.ConfigDB, cleanuptbl)
 
 		cleanupstatetbl = map[string]interface{}{
-			"AMPLIFIER_TABLE": map[string]interface{}{fmt.Sprintf("AMPLIFIER-1-%d-2", idx+1): ""},
-			"OSC_TABLE":       map[string]interface{}{fmt.Sprintf("OSC-1-%d-2", idx+1): ""},
+			"OTN_OA_TABLE":  map[string]interface{}{fmt.Sprintf("AMPLIFIER-1-%d-2", idx+1): ""},
+			"OTN_OSC_TABLE": map[string]interface{}{fmt.Sprintf("OSC-1-%d-2", idx+1): ""},
 		}
-		unloadDB(dbName, db.StateDB, cleanupstatetbl)
+		unloadMdbDB(dbName, db.StateDB, cleanupstatetbl)
 
 		cleanupcountertbl = map[string]interface{}{
-			"AMPLIFIER": map[string]interface{}{fmt.Sprintf("AMPLIFIER-1-%d-2_ActualGain:15_pm_current", idx+1): ""},
-			"OSC":       map[string]interface{}{fmt.Sprintf("OSC-1-%d-2_OutputPower:15_pm_current", idx+1): ""},
+			"OTN_OA": map[string]interface{}{fmt.Sprintf("AMPLIFIER-1-%d-2_ActualGain:15_pm_current", idx+1): ""},
+			"OSC":    map[string]interface{}{fmt.Sprintf("OSC-1-%d-2_OutputPower:15_pm_current", idx+1): ""},
 		}
-		unloadDB(dbName, db.CountersDB, cleanupcountertbl)
+		unloadMdbDB(dbName, db.CountersDB, cleanupcountertbl)
 	}
 }
 
@@ -160,7 +160,7 @@ func Test_set_amplifier_config_DB_key_and_field_xfmr(t *testing.T) {
 		url_body_json := fmt.Sprintf("{\"config\":{\"amp-mode\":\"openconfig-optical-amplifier:CONSTANT_GAIN\",\"enabled\":false,\"fiber-type-profile\":\"openconfig-optical-amplifier:SSMF\",\"gain-range\":\"openconfig-optical-amplifier:MID_GAIN_RANGE\",\"max-gain\":\"30\",\"max-output-power\":\"5\",\"min-gain\":\"15\",\"name\":\"AMPLIFIER-1-%d-3\",\"target-gain\":\"10.5\",\"target-gain-tilt\":\"12.5\",\"target-output-power\":\"0\",\"type\":\"openconfig-optical-amplifier:EDFA\"}}", idx+1)
 
 		pre_req_map := map[string]interface{}{
-			"AMPLIFIER": map[string]interface{}{
+			"OTN_OA": map[string]interface{}{
 				fmt.Sprintf("AMPLIFIER-1-%d-3", idx+1): map[string]interface{}{
 					"type":                "EDFA",
 					"target-gain":         15.5,
@@ -176,9 +176,9 @@ func Test_set_amplifier_config_DB_key_and_field_xfmr(t *testing.T) {
 				},
 			},
 		}
-		loadDB(dbName, db.ConfigDB, pre_req_map)
+		loadMdbDB(dbName, db.ConfigDB, pre_req_map)
 		expected_map := map[string]interface{}{
-			"AMPLIFIER": map[string]interface{}{
+			"OTN_OA": map[string]interface{}{
 				fmt.Sprintf("AMPLIFIER-1-%d-3", idx+1): map[string]interface{}{
 					"type":                "EDFA",
 					"target-gain":         10.5,
@@ -202,7 +202,7 @@ func Test_set_amplifier_config_DB_key_and_field_xfmr(t *testing.T) {
 		time.Sleep(1 * time.Second)
 
 		//GET Test
-		t.Run("Verify replace on Amplifier yang", verifyDbResult(rclient[dbName], fmt.Sprintf("AMPLIFIER|AMPLIFIER-1-%d-3", idx+1), expected_map, false))
+		t.Run("Verify replace on Amplifier yang", verifyDbResult(rclientNs[dbName], fmt.Sprintf("OTN_OA|AMPLIFIER-1-%d-3", idx+1), expected_map, false))
 		time.Sleep(1 * time.Second)
 
 		//Delete Test
@@ -217,7 +217,7 @@ func Test_set_amplifier_config_DB_key_and_field_xfmr(t *testing.T) {
 		time.Sleep(1 * time.Second)
 
 		expected_map = map[string]interface{}{
-			"AMPLIFIER": map[string]interface{}{
+			"OTN_OA": map[string]interface{}{
 				fmt.Sprintf("AMPLIFIER-1-%d-4", idx+1): map[string]interface{}{
 					"type":                "EDFA",
 					"target-gain":         30.22,
@@ -235,7 +235,7 @@ func Test_set_amplifier_config_DB_key_and_field_xfmr(t *testing.T) {
 		}
 
 		//Verify After the POST test
-		t.Run("Verify After the POST test on Amplifier yang", verifyDbResult(rclient[dbName], fmt.Sprintf("AMPLIFIER|AMPLIFIER-1-%d-4", idx+1), expected_map, false))
+		t.Run("Verify After the POST test on Amplifier yang", verifyDbResult(rclientNs[dbName], fmt.Sprintf("OTN_OA|AMPLIFIER-1-%d-4", idx+1), expected_map, false))
 
 		//Delete After the POST test
 		url = fmt.Sprintf("/openconfig-optical-amplifier:optical-amplifier/amplifiers/amplifier[name=AMPLIFIER-1-%d-4]/config", idx+1)
@@ -249,7 +249,7 @@ func Test_set_amplifier_config_DB_key_and_field_xfmr(t *testing.T) {
 		t.Run("Create test on Amplifier yang", processSetRequest(url, Bulk_post_payload, "POST", false))
 
 		expected_map = map[string]interface{}{
-			"AMPLIFIER": map[string]interface{}{
+			"OTN_OA": map[string]interface{}{
 				fmt.Sprintf("AMPLIFIER-1-%d-5", idx+1): map[string]interface{}{
 					"type":                "EDFA",
 					"target-gain":         30.22,
@@ -268,10 +268,10 @@ func Test_set_amplifier_config_DB_key_and_field_xfmr(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 		//Verify After the Bulk test
-		t.Run("Verify After the Bulk test on Amplifier yang", verifyDbResult(rclient[dbName], fmt.Sprintf("AMPLIFIER|AMPLIFIER-1-%d-5", idx+1), expected_map, false))
+		t.Run("Verify After the Bulk test on Amplifier yang", verifyDbResult(rclientNs[dbName], fmt.Sprintf("OTN_OA|AMPLIFIER-1-%d-5", idx+1), expected_map, false))
 
 		expected_map = map[string]interface{}{
-			"AMPLIFIER": map[string]interface{}{
+			"OTN_OA": map[string]interface{}{
 				fmt.Sprintf("AMPLIFIER-1-%d-6", idx+1): map[string]interface{}{
 					"type":                "EDFA",
 					"target-gain":         20.22,
@@ -290,7 +290,7 @@ func Test_set_amplifier_config_DB_key_and_field_xfmr(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 		//Verify After the POST test
-		t.Run("Verify After the Bulk test on Amplifier yang", verifyDbResult(rclient[dbName], fmt.Sprintf("AMPLIFIER|AMPLIFIER-1-%d-6", idx+1), expected_map, false))
+		t.Run("Verify After the Bulk test on Amplifier yang", verifyDbResult(rclientNs[dbName], fmt.Sprintf("OTN_OA|AMPLIFIER-1-%d-6", idx+1), expected_map, false))
 
 		//Delete keys After the Bulk Test
 		url = fmt.Sprintf("/openconfig-optical-amplifier:optical-amplifier/amplifiers/amplifier[name=AMPLIFIER-1-%d-5]/config", idx+1)
