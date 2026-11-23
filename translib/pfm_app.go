@@ -40,7 +40,7 @@ type PlatformApp struct {
 
 func init() {
 	log.Info("Init called for Platform module")
-	err := register("/openconfig-platform:components",
+	err := register("/openconfig-platform:components/component[name=System Eeprom]",
 		&appInfo{appType: reflect.TypeOf(PlatformApp{}),
 			ygotRootType: reflect.TypeOf(ocbinds.OpenconfigPlatform_Components{}),
 			isNative:     false})
@@ -437,9 +437,13 @@ func (app *PlatformApp) doGetSysEeprom() error {
 	var err error
 	pf_cpts := app.getAppRootObject()
 
-	targetUriPath, _ := getYangPathFromUri(app.path.Path)
+	xpath := app.path.Path
+	targetUriPath, _ := getYangPathFromUri(xpath)
+
+	log.Infof("EEPROM targetUriPath:%v", targetUriPath)
+
 	switch targetUriPath {
-	case "/openconfig-platform:components":
+	case "/openconfig-platform:component":
 		pf_comp, _ := pf_cpts.NewComponent("System Eeprom")
 		ygot.BuildEmptyTree(pf_comp)
 		err = app.getSysEepromFromDb(pf_comp.State, true)
