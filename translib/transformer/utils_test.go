@@ -75,12 +75,7 @@ func processGetRequest(url string, qparams *queryParamsUT, expectedRespJson stri
 			t.Fatalf("failed to unmarshal %v err: %v", expectedRespJson, err)
 		}
 
-		var respJson []byte
-		if len(response) == 0 {
-			respJson = []byte("{}")
-		} else {
-			respJson = response[0].Payload
-		}
+		respJson := response.Payload
 		err = json.Unmarshal(respJson, &receivedMap)
 		if err != nil {
 			t.Fatalf("failed to unmarshal %v err: %v", string(respJson), err)
@@ -116,10 +111,7 @@ func processGetRequestWithFile(url string, expectedJsonFile string, errorCase bo
 			return
 		}
 
-		if len(response) == 0 {
-			t.Fatalf("empty Get response for Url: %s", url)
-		}
-		respJson := response[0].Payload
+		respJson := response.Payload
 		err = json.Unmarshal(respJson, &receivedMap)
 		if err != nil {
 			t.Fatalf("failed to unmarshal %v err: %v", string(respJson), err)

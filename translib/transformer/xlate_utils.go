@@ -615,37 +615,14 @@ func findInMap(m map[string]string, str string) string {
 	return ""
 }
 
-func getDBOptions(dbNo db.DBNum, opts ...func(*db.Options)) db.Options {
+func getDBOptions(dbNo db.DBNum) db.Options {
 	var opt db.Options
-	separator := ""
 
-	if multiDbsConfigMap != nil {
-		dbName := db.GetDBInstName(dbNo)
-		dbList, ok := multiDbsConfigMap["DATABASES"]
-		if ok {
-			dbSep, ok := dbList[dbName].(map[string]interface{})["separator"]
-			if ok {
-				separator = dbSep.(string)
-			}
-		}
-	}
-
-	if separator == "" {
-		switch dbNo {
-		case db.ApplDB, db.CountersDB, db.ErrorDB, db.FlexCounterDB, db.AsicDB, db.LogLevelDB:
-			separator = ":"
-		case db.SnmpDB, db.ConfigDB, db.StateDB, db.EventDB:
-			separator = "|"
-		}
-	}
-	opt = getDBOptionsWithSeparator(dbNo, "", separator, separator)
-	for _, setopt := range opts {
-		setopt(&opt)
-
-	}
-	// If MDBName is not set, use the default nameSpace value
-	if opt.MDBName == "" {
-		opt.MDBName = "host"
+	switch dbNo {
+	case db.ApplDB, db.CountersDB, db.FlexCounterDB, db.AsicDB:
+		opt = getDBOptionsWithSeparator(dbNo, "", ":", ":")
+	case db.ConfigDB, db.StateDB:
+		opt = getDBOptionsWithSeparator(dbNo, "", "|", "|")
 	}
 
 	return opt
@@ -963,12 +940,12 @@ func xpathKeyExtractForGet(d *db.DB, ygRoot *ygot.GoStruct, oper Operation, path
 		tblKeyInfo, tblKeyOk = xfmrTblKeyCache[retData.xpath]
 	}
 
-	if tblKeyOk && tblKeyInfo.ygXpathInfo != nil {
+	if tblKeyOk {
 		ygXpathInfo = tblKeyInfo.ygXpathInfo
 		curPathWithKey = strings.Join(pathList[:tblKeyInfo.pathIdx], "/")
 		pathIdx = tblKeyInfo.pathIdx
 		childListNodePathIdx = tblKeyInfo.childListNodePathIdx
-		log.V(5).Infof("xpathKeyExtractForGet: found key xfmr: %v in cache; retData.xpath: %v; pathIdx: %v;"+
+		log.V(5).Infof("xpathKeyExtractForGet: found key xfmr: %v in cache;  retData.xpath: %v; pathIdx: %v;"+
 			" childListNodePathIdx: %v; curPathWithKey: %v", ygXpathInfo.xfmrKey, retData.xpath, pathIdx, childListNodePathIdx, curPathWithKey)
 	} else {
 		for len(ygXpathInfo.xfmrKey) == 0 {
