@@ -17,7 +17,7 @@ module openconfig-optical-amplifier-annot {
 
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:amplifiers {
       deviate add {
-        sonic-ext:table-name "AMPLIFIER";
+        sonic-ext:table-name "OTN_OA";
       }
     }
 
@@ -107,7 +107,7 @@ module openconfig-optical-amplifier-annot {
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:amplifiers/oc-opt-amp:amplifier/oc-opt-amp:state {
       deviate add {
         sonic-ext:db-name "STATE_DB";
-        sonic-ext:table-name "AMPLIFIER_TABLE";
+        sonic-ext:table-name "OTN_OA_TABLE";
         sonic-ext:key-transformer "oa_name_key_xfmr";
       }
     }
@@ -200,7 +200,7 @@ module openconfig-optical-amplifier-annot {
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:supervisory-channels {
       deviate add {
         sonic-ext:db-name "STATE_DB";
-        sonic-ext:table-name "OSC_TABLE";
+        sonic-ext:table-name "OTN_OSC_TABLE";
       }
     }
 
@@ -224,7 +224,7 @@ module openconfig-optical-amplifier-annot {
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:supervisory-channels/oc-opt-amp:supervisory-channel/oc-opt-amp:state {
       deviate add {
         sonic-ext:db-name "STATE_DB";
-        sonic-ext:table-name "OSC_TABLE";
+        sonic-ext:table-name "OTN_OSC_TABLE";
         sonic-ext:key-transformer "osc_key_xfmr";
       }
     }
@@ -398,7 +398,7 @@ module openconfig-optical-amplifier-annot {
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:amplifiers/oc-opt-amp:amplifier/oc-opt-amp:state/oc-opt-amp:output-power-l-band {
       deviate add {
         sonic-ext:db-name "COUNTERS_DB";
-        sonic-ext:table-name "AMPLIFIER";
+        sonic-ext:table-name "OTN_OA";
         sonic-ext:key-transformer "oa_counter_output_powerL_key_xfmr";
       }
     }
@@ -448,7 +448,7 @@ module openconfig-optical-amplifier-annot {
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:amplifiers/oc-opt-amp:amplifier/oc-opt-amp:state/oc-opt-amp:optical-return-loss {
       deviate add {
         sonic-ext:db-name "COUNTERS_DB";
-        sonic-ext:table-name "AMPLIFIER";
+        sonic-ext:table-name "OTN_OA";
         sonic-ext:key-transformer "oa_counter_optical_return_loss_key_xfmr";
       }
     }
@@ -504,7 +504,7 @@ module openconfig-optical-amplifier-annot {
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:amplifiers/oc-opt-amp:amplifier/oc-opt-amp:state/oc-opt-amp:output-power-c-band {
       deviate add {
         sonic-ext:db-name "COUNTERS_DB";
-        sonic-ext:table-name "AMPLIFIER";
+        sonic-ext:table-name "OTN_OA";
         sonic-ext:key-transformer "oa_counter_output_powerC_key_xfmr";
       }
     }
@@ -554,7 +554,7 @@ module openconfig-optical-amplifier-annot {
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:amplifiers/oc-opt-amp:amplifier/oc-opt-amp:state/oc-opt-amp:laser-bias-current {
       deviate add {
         sonic-ext:db-name "COUNTERS_DB";
-        sonic-ext:table-name "AMPLIFIER";
+        sonic-ext:table-name "OTN_OA";
         sonic-ext:key-transformer "oa_counter_laser_bias_key_xfmr";
       }
     }
@@ -604,7 +604,7 @@ module openconfig-optical-amplifier-annot {
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:amplifiers/oc-opt-amp:amplifier/oc-opt-amp:state/oc-opt-amp:input-power-c-band {
       deviate add {
         sonic-ext:db-name "COUNTERS_DB";
-        sonic-ext:table-name "AMPLIFIER";
+        sonic-ext:table-name "OTN_OA";
         sonic-ext:key-transformer "oa_counter_input_powerC_key_xfmr";
       }
     }
@@ -660,7 +660,7 @@ module openconfig-optical-amplifier-annot {
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:amplifiers/oc-opt-amp:amplifier/oc-opt-amp:state/oc-opt-amp:output-power-total {
       deviate add {
         sonic-ext:db-name "COUNTERS_DB";
-        sonic-ext:table-name "AMPLIFIER";
+        sonic-ext:table-name "OTN_OA";
         sonic-ext:key-transformer "oa_counter_output_power_total_key_xfmr";
       }
     }
@@ -710,7 +710,7 @@ module openconfig-optical-amplifier-annot {
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:amplifiers/oc-opt-amp:amplifier/oc-opt-amp:state/oc-opt-amp:input-power-total {
       deviate add {
         sonic-ext:db-name "COUNTERS_DB";
-        sonic-ext:table-name "AMPLIFIER";
+        sonic-ext:table-name "OTN_OA";
         sonic-ext:key-transformer "oa_counter_input_power_total_key_xfmr";
       }
     }
@@ -760,7 +760,7 @@ module openconfig-optical-amplifier-annot {
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:amplifiers/oc-opt-amp:amplifier/oc-opt-amp:state/oc-opt-amp:actual-gain {
       deviate add {
         sonic-ext:db-name "COUNTERS_DB";
-        sonic-ext:table-name "AMPLIFIER";
+        sonic-ext:table-name "OTN_OA";
         sonic-ext:key-transformer "oa_counter_actual_gain_key_xfmr";
       }
     }
@@ -810,7 +810,7 @@ module openconfig-optical-amplifier-annot {
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:amplifiers/oc-opt-amp:amplifier/oc-opt-amp:state/oc-opt-amp:input-power-l-band {
       deviate add {
         sonic-ext:db-name "COUNTERS_DB";
-        sonic-ext:table-name "AMPLIFIER";
+        sonic-ext:table-name "OTN_OA";
         sonic-ext:key-transformer "oa_counter_input_powerL_key_xfmr";
       }
     }
@@ -866,7 +866,7 @@ module openconfig-optical-amplifier-annot {
     deviation /oc-opt-amp:optical-amplifier/oc-opt-amp:amplifiers/oc-opt-amp:amplifier/oc-opt-amp:state/oc-opt-amp:actual-gain-tilt {
       deviate add {
         sonic-ext:db-name "COUNTERS_DB";
-        sonic-ext:table-name "AMPLIFIER";
+        sonic-ext:table-name "OTN_OA";
         sonic-ext:key-transformer "oa_counter_actual_gain_tilt_key_xfmr";
       }
     }
